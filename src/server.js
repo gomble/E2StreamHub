@@ -69,6 +69,35 @@ async function enigmaGet(apiPath, params = {}) {
   return response.data;
 }
 
+// Resolve the actual stream host/port/path for a service reference.
+// OpenWebif's /web/stream.m3u returns the correct single-program stream URL
+// (SPTS, right port) — much better than connecting to port 8001 directly
+// which returns a raw MPTS (full transponder, multiple programmes).
+async function resolveStreamTarget(sRef) {
+  try {
+    const config = { params: { ref: sRef }, responseType: 'text', timeout: 5000 };
+    if (enigmaAuth) config.auth = enigmaAuth;
+    const response = await axios.get(`${enigmaBase}/web/stream.m3u`, config);
+    const m3u = response.data || '';
+    for (const line of m3u.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        const url = new URL(trimmed);
+        // Replace hostname: Docker may not resolve the box's mDNS/Fritz.Box name
+        return {
+          host: ENIGMA2_HOST,
+          port: parseInt(url.port, 10) || ENIGMA2_STREAM_PORT,
+          path: url.pathname,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('M3U stream resolution failed, falling back to port', ENIGMA2_STREAM_PORT, '–', e.message);
+  }
+  // Fallback: direct port 8001 (or configured ENIGMA2_STREAM_PORT)
+  return { host: ENIGMA2_HOST, port: ENIGMA2_STREAM_PORT, path: `/${sRef}` };
+}
+
 // ─── API routes ───────────────────────────────────────────────────────────────
 
 app.get('/api/bouquets', requireAuth, async (req, res) => {
@@ -124,17 +153,19 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
 // Proxies the MPEG-TS stream from enigma2 port 8001 to the browser.
 // This avoids CORS issues and keeps receiver credentials server-side.
 
-app.get('/stream/*', requireAuth, (req, res) => {
+app.get('/stream/*', requireAuth, async (req, res) => {
   // Decode the service reference (the client sends it URL-encoded)
   const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
-  console.log(`Stream request: ${sRef}`);
+  // Auto-discover the correct stream host/port via OpenWebif M3U API
+  const target = await resolveStreamTarget(sRef);
+  console.log(`Stream: ${sRef} → ${target.host}:${target.port}${target.path}`);
 
   const reqOptions = {
-    hostname: ENIGMA2_HOST,
-    port: ENIGMA2_STREAM_PORT,
-    path: `/${sRef}`,
+    hostname: target.host,
+    port: target.port,
+    path: target.path,
     method: 'GET',
     headers: { 'User-Agent': 'E2StreamHub/1.0' },
   };
