@@ -271,7 +271,7 @@ input { font-family: inherit; }
 .video-overlay.hidden { opacity: 0; }
 
 .overlay-icon { font-size: 48px; margin-bottom: 12px; opacity: .4; }
-.overlay-text { font-size: 14px; opacity: .6; }
+.overlay-text { font-size: 14px; opacity: .6; max-width: 480px; text-align: center; padding: 0 24px; line-height: 1.6; }
 
 .buffering-spinner {
   position: absolute;

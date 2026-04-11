@@ -170,6 +170,11 @@ app.get('/stream/*', requireAuth, (req, res) => {
 
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
 
+// Serve mpegts.js from node_modules to avoid CDN tracking prevention issues
+app.use('/js/mpegts.js', express.static(
+  path.join(__dirname, '../node_modules/mpegts.js/dist/mpegts.js')
+));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {

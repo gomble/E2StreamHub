@@ -184,18 +184,21 @@
       player.load();
       player.play().catch(() => {});
 
-      player.on(mpegts.Events.ERROR, (errType, errDetail) => {
-        console.error('mpegts error:', errType, errDetail);
+      player.on(mpegts.Events.ERROR, (errType, errDetail, errInfo) => {
+        console.error('mpegts error:', errType, errDetail, errInfo);
         bufferingSpinner.classList.remove('visible');
+        if (errType === mpegts.ErrorTypes.MEDIA_ERROR) {
+          showVideoError('Codec not supported — this channel may broadcast in HEVC/H.265. Try installing "HEVC Video Extensions" from the Microsoft Store, or use Google Chrome.');
+        } else if (errType === mpegts.ErrorTypes.NETWORK_ERROR) {
+          showVideoError('Stream unavailable — check that the receiver is on and reachable.');
+        }
       });
     } else {
-      // Fallback: set src directly (may work for some browsers / formats)
-      videoEl.src = streamUrl;
-      videoEl.play().catch(() => {});
+      showVideoError('Your browser does not support MSE/MPEG-TS playback. Please use Chrome or Edge.');
     }
 
     videoEl.onwaiting = () => bufferingSpinner.classList.add('visible');
-    videoEl.onplaying = () => bufferingSpinner.classList.remove('visible');
+    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); }
     videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
 
     // Load EPG for the selected channel
@@ -304,6 +307,19 @@
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function showVideoError(msg) {
+    bufferingSpinner.classList.remove('visible');
+    videoOverlay.classList.remove('hidden');
+    videoOverlay.querySelector('.overlay-icon').textContent = '⚠';
+    videoOverlay.querySelector('.overlay-text').textContent = msg;
+  }
+
+  function hideVideoError() {
+    videoOverlay.classList.add('hidden');
+    videoOverlay.querySelector('.overlay-icon').textContent = '▶';
+    videoOverlay.querySelector('.overlay-text').textContent = 'Select a channel';
   }
 
   // ─── Boot ─────────────────────────────────────────────────────────────────
