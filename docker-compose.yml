@@ -5,21 +5,21 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # IP-Adresse / Hostname deines Enigma2-Empfängers (Gigablue Quad 4K Pro)
+      # IP address / hostname of your Enigma2 receiver (Gigablue Quad 4K Pro)
       - ENIGMA2_HOST=192.168.1.100
-      # OpenWebif HTTP-Port (Standard: 80)
+      # OpenWebif HTTP port (default: 80)
       - ENIGMA2_PORT=80
-      # Streaming-Port (Standard: 8001)
+      # Streaming port (default: 8001)
       - ENIGMA2_STREAM_PORT=8001
-      # Zugangsdaten des Empfängers (leer lassen wenn keins gesetzt)
+      # Receiver credentials (leave empty if no auth is configured)
       - ENIGMA2_USER=
       - ENIGMA2_PASSWORD=
-      # Login-Daten für das Web-Interface (ändern!)
+      # Web interface login credentials (change these!)
       - APP_USERNAME=admin
       - APP_PASSWORD=admin
-      # Zufälliger Secret für Sessions (ändern!)
-      - SESSION_SECRET=bitte-aendern-32-zeichen-zufaellig
+      # Random secret for session signing (change this!)
+      - SESSION_SECRET=please-change-this-to-a-random-32-char-string
     restart: unless-stopped
-    # Netzwerk-Modus: host ermöglicht direkten Zugriff auf den Empfänger
-    # Alternativ: bridge und sicherstellen dass ENIGMA2_HOST erreichbar ist
+    # Network mode: use "host" on Linux to allow direct LAN access to the receiver.
+    # In bridge mode make sure ENIGMA2_HOST is reachable from the container.
     # network_mode: host

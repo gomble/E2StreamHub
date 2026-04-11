@@ -48,7 +48,7 @@
 
   // ─── Load EPG ─────────────────────────────────────────────────────────────
   async function loadAndRender(bRef) {
-    epgGuide.innerHTML = '<div class="epg-guide-loading">EPG wird geladen…</div>';
+    epgGuide.innerHTML = '<div class="epg-guide-loading">Loading EPG…</div>';
 
     try {
       // Step 1: Get services for the bouquet
@@ -56,7 +56,7 @@
       const services = (svcData.services || []).slice(0, 50); // limit to 50 channels
 
       if (services.length === 0) {
-        epgGuide.innerHTML = '<div class="epg-guide-placeholder">Keine Kanäle im Bouquet</div>';
+        epgGuide.innerHTML = '<div class="epg-guide-placeholder">No channels in bouquet</div>';
         return;
       }
 
@@ -90,7 +90,7 @@
 
       renderGuide();
     } catch (e) {
-      epgGuide.innerHTML = `<div class="epg-guide-placeholder">Fehler: ${window._app.escHtml(e.message)}</div>`;
+      epgGuide.innerHTML = `<div class="epg-guide-placeholder">Error: ${window._app.escHtml(e.message)}</div>`;
     }
   }
 
@@ -224,11 +224,11 @@
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function fmtTime(date) {
-    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
 
   function fmtDateTime(date) {
-    return date.toLocaleString('de-DE', {
+    return date.toLocaleString('en-GB', {
       weekday: 'short', hour: '2-digit', minute: '2-digit',
     });
   }

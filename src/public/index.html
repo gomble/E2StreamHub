@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -19,9 +19,9 @@
     <button class="nav-btn" data-view="epg">EPG Guide</button>
   </nav>
   <div class="topbar-right">
-    <span class="status-dot" id="statusDot" title="Empfänger Status"></span>
+    <span class="status-dot" id="statusDot" title="Receiver Status"></span>
     <span class="current-time" id="currentTime"></span>
-    <button class="logout-btn" id="logoutBtn">Abmelden</button>
+    <button class="logout-btn" id="logoutBtn">Sign out</button>
   </div>
 </header>
 
@@ -30,11 +30,11 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <select class="bouquet-select" id="bouquetSelect">
-        <option value="">Bouquet laden…</option>
+        <option value="">Loading bouquets…</option>
       </select>
     </div>
     <div class="channel-list" id="channelList">
-      <div class="list-placeholder">Bitte Bouquet auswählen</div>
+      <div class="list-placeholder">Please select a bouquet</div>
     </div>
   </aside>
 
@@ -44,7 +44,7 @@
         <video id="videoPlayer" controls playsinline></video>
         <div class="video-overlay" id="videoOverlay">
           <div class="overlay-icon">▶</div>
-          <div class="overlay-text">Kanal auswählen</div>
+          <div class="overlay-text">Select a channel</div>
         </div>
         <div class="buffering-spinner" id="bufferingSpinner"></div>
       </div>
@@ -62,9 +62,9 @@
     </div>
 
     <div class="epg-panel" id="epgPanel">
-      <div class="epg-panel-header">Programminfo</div>
+      <div class="epg-panel-header">Programme Info</div>
       <div class="epg-panel-content" id="epgContent">
-        <div class="epg-empty">Kein Kanal ausgewählt</div>
+        <div class="epg-empty">No channel selected</div>
       </div>
     </div>
   </main>
@@ -75,21 +75,21 @@
   <div class="epg-guide-header">
     <div class="epg-guide-controls">
       <select class="bouquet-select" id="epgBouquetSelect">
-        <option value="">Bouquet auswählen…</option>
+        <option value="">Select bouquet…</option>
       </select>
-      <button class="btn-secondary" id="epgLoadBtn">EPG laden</button>
+      <button class="btn-secondary" id="epgLoadBtn">Load EPG</button>
     </div>
     <div class="epg-time-nav">
       <button class="btn-icon" id="epgPrevBtn">◀</button>
       <span class="epg-time-range" id="epgTimeRange"></span>
       <button class="btn-icon" id="epgNextBtn">▶</button>
-      <button class="btn-secondary" id="epgNowBtn">Jetzt</button>
+      <button class="btn-secondary" id="epgNowBtn">Now</button>
     </div>
   </div>
 
   <div class="epg-guide-container">
     <div class="epg-guide-inner" id="epgGuide">
-      <div class="epg-guide-placeholder">Bouquet auswählen und EPG laden</div>
+      <div class="epg-guide-placeholder">Select a bouquet and load EPG</div>
     </div>
   </div>
 </div>

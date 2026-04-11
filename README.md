@@ -1,58 +1,58 @@
 # E2StreamHub
 
-Web-basiertes Streaming-Interface für Enigma2-Empfänger (Gigablue, Dreambox, VU+ etc.) mit OpenWebif.
+Web-based streaming interface for Enigma2 receivers (Gigablue, Dreambox, VU+ etc.) using OpenWebif.
 
 ## Features
 
-- **Live-Streaming** direkt im Browser (MPEG-TS via mpegts.js)
-- **Bouquet & Kanal-Browser** (Sat + IPTV)
-- **EPG-Infopanel** mit aktuellem und folgenden Programmen
-- **EPG-Timeline** (TV-Guide) mit 3-Stunden-Ansicht
-- **Authentifizierung** (Web-Interface Login)
+- **Live streaming** directly in the browser (MPEG-TS via mpegts.js)
+- **Bouquet & channel browser** (Satellite + IPTV)
+- **EPG info panel** with current and upcoming programmes
+- **EPG timeline** (TV guide) with 3-hour scrollable view
+- **Session authentication** for the web interface
 - **Docker-ready**
 
-## Schnellstart mit Docker
+## Quick Start with Docker
 
-### 1. Repository klonen
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/DEIN-USERNAME/E2StreamHub.git
+git clone https://github.com/YOUR-USERNAME/E2StreamHub.git
 cd E2StreamHub
 ```
 
-### 2. `docker-compose.yml` anpassen
+### 2. Edit `docker-compose.yml`
 
 ```yaml
 environment:
-  - ENIGMA2_HOST=192.168.1.XXX   # IP deines Empfängers
-  - ENIGMA2_PORT=80               # OpenWebif Port (Standard: 80)
-  - ENIGMA2_STREAM_PORT=8001      # Streaming Port (Standard: 8001)
-  - ENIGMA2_USER=                 # Empfänger-Benutzername (leer = kein Auth)
-  - ENIGMA2_PASSWORD=             # Empfänger-Passwort
-  - APP_USERNAME=admin            # Login für das Web-Interface
-  - APP_PASSWORD=MeinSicheresPasswort
-  - SESSION_SECRET=ZufaelligerGeheimString32Zeichen
+  - ENIGMA2_HOST=192.168.1.XXX   # IP address of your receiver
+  - ENIGMA2_PORT=80               # OpenWebif port (default: 80)
+  - ENIGMA2_STREAM_PORT=8001      # Streaming port (default: 8001)
+  - ENIGMA2_USER=                 # Receiver username (leave empty if no auth)
+  - ENIGMA2_PASSWORD=             # Receiver password
+  - APP_USERNAME=admin            # Web interface login username
+  - APP_PASSWORD=MySecurePassword
+  - SESSION_SECRET=RandomStringAtLeast32Chars
 ```
 
-### 3. Container starten
+### 3. Start the container
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Browser öffnen
+### 4. Open in browser
 
 ```
-http://DEIN-SERVER-IP:3000
+http://YOUR-SERVER-IP:3000
 ```
 
 ---
 
-## Netzwerk-Hinweis
+## Network Note
 
-Der Docker-Container muss deinen Enigma2-Empfänger erreichen können. Wenn beides im selben LAN ist, funktioniert es mit dem Standard `bridge` Netzwerkmodus und der korrekten IP in `ENIGMA2_HOST`.
+The Docker container must be able to reach your Enigma2 receiver. If both are on the same LAN, the default `bridge` network mode works fine with the correct IP in `ENIGMA2_HOST`.
 
-Falls Verbindungsprobleme auftreten, kann `network_mode: host` in der `docker-compose.yml` helfen (Linux only):
+If you experience connection issues, `network_mode: host` in `docker-compose.yml` may help (Linux only):
 
 ```yaml
 network_mode: host
@@ -60,49 +60,46 @@ network_mode: host
 
 ---
 
-## Umgebungsvariablen
+## Environment Variables
 
-| Variable              | Standard              | Beschreibung                                |
-|-----------------------|-----------------------|---------------------------------------------|
-| `ENIGMA2_HOST`        | `192.168.1.100`       | IP-Adresse / Hostname des Empfängers        |
-| `ENIGMA2_PORT`        | `80`                  | OpenWebif HTTP-Port                         |
-| `ENIGMA2_STREAM_PORT` | `8001`                | Enigma2 Streaming-Port                      |
-| `ENIGMA2_USER`        | *(leer)*              | HTTP-Auth Benutzername (falls aktiviert)    |
-| `ENIGMA2_PASSWORD`    | *(leer)*              | HTTP-Auth Passwort                          |
-| `APP_USERNAME`        | `admin`               | Benutzername für das Web-Interface          |
-| `APP_PASSWORD`        | `admin`               | Passwort für das Web-Interface (**ändern!**)|
-| `SESSION_SECRET`      | *(Standardwert)*      | Zufälliger String für Sessions (**ändern!**)|
-| `PORT`                | `3000`                | HTTP-Port des Containers                    |
+| Variable              | Default               | Description                                         |
+|-----------------------|-----------------------|-----------------------------------------------------|
+| `ENIGMA2_HOST`        | `192.168.1.100`       | IP address / hostname of the receiver               |
+| `ENIGMA2_PORT`        | `80`                  | OpenWebif HTTP port                                 |
+| `ENIGMA2_STREAM_PORT` | `8001`                | Enigma2 streaming port                              |
+| `ENIGMA2_USER`        | *(empty)*             | HTTP auth username (if enabled on the receiver)     |
+| `ENIGMA2_PASSWORD`    | *(empty)*             | HTTP auth password                                  |
+| `APP_USERNAME`        | `admin`               | Web interface login username                        |
+| `APP_PASSWORD`        | `admin`               | Web interface login password (**change this!**)     |
+| `SESSION_SECRET`      | *(default)*           | Random string for session signing (**change this!**)|
+| `PORT`                | `3000`                | HTTP port exposed by the container                  |
 
 ---
 
-## Lokale Entwicklung (ohne Docker)
+## Local Development (without Docker)
 
 ```bash
 npm install
-# .env.example kopieren und anpassen
 cp .env.example .env
-# .env bearbeiten (ENIGMA2_HOST etc.)
+# Edit .env and set ENIGMA2_HOST etc.
 npm run dev
 ```
 
 ---
 
-## Technologie
+## Tech Stack
 
-- **Backend**: Node.js + Express (MPEG-TS Stream-Proxy, OpenWebif-API-Proxy)
-- **Frontend**: Vanilla HTML/CSS/JS
+- **Backend**: Node.js + Express (MPEG-TS stream proxy, OpenWebif API proxy)
+- **Frontend**: Vanilla HTML / CSS / JS
 - **Player**: [mpegts.js](https://github.com/xqq/mpegts.js)
 - **Container**: Docker (Node 20 Alpine)
 
-## OpenWebif API
+## OpenWebif API Endpoints Used
 
-Der Backend-Proxy nutzt folgende OpenWebif-Endpunkte:
-
-| Endpunkt                         | Verwendung              |
-|----------------------------------|-------------------------|
-| `/api/bouquets`                  | Bouquet-Liste           |
-| `/api/getservices?sRef=...`      | Kanäle im Bouquet       |
-| `/api/epgservice?sRef=...`       | EPG eines Kanals        |
-| `/api/epgbouquet?bRef=...`       | EPG-Bulk für TV-Guide   |
-| `http://HOST:8001/<sRef>`        | Live-Stream             |
+| Endpoint                         | Purpose                    |
+|----------------------------------|----------------------------|
+| `/api/bouquets`                  | Bouquet list               |
+| `/api/getservices?sRef=...`      | Channels in a bouquet      |
+| `/api/epgservice?sRef=...`       | EPG for a single channel   |
+| `/api/epgbouquet?bRef=...`       | Bulk EPG for TV guide      |
+| `http://HOST:8001/<sRef>`        | Live stream                |

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -120,18 +120,18 @@
       <p>Enigma2 Web Streaming</p>
     </div>
 
-    <div class="error" id="errorMsg">Ungültige Anmeldedaten</div>
+    <div class="error" id="errorMsg">Invalid credentials</div>
 
     <form id="loginForm">
       <div class="field">
-        <label for="username">Benutzername</label>
+        <label for="username">Username</label>
         <input type="text" id="username" name="username" autocomplete="username" autofocus required />
       </div>
       <div class="field">
-        <label for="password">Passwort</label>
+        <label for="password">Password</label>
         <input type="password" id="password" name="password" autocomplete="current-password" required />
       </div>
-      <button type="submit" id="submitBtn">Anmelden</button>
+      <button type="submit" id="submitBtn">Sign in</button>
     </form>
   </div>
 
@@ -141,7 +141,7 @@
       const btn = document.getElementById('submitBtn');
       const errorMsg = document.getElementById('errorMsg');
       btn.disabled = true;
-      btn.textContent = 'Anmelden…';
+      btn.textContent = 'Signing in…';
       errorMsg.classList.remove('visible');
 
       try {
@@ -159,13 +159,13 @@
         } else {
           errorMsg.classList.add('visible');
           btn.disabled = false;
-          btn.textContent = 'Anmelden';
+          btn.textContent = 'Sign in';
         }
       } catch {
-        errorMsg.textContent = 'Server nicht erreichbar';
+        errorMsg.textContent = 'Server unreachable';
         errorMsg.classList.add('visible');
         btn.disabled = false;
-        btn.textContent = 'Anmelden';
+        btn.textContent = 'Sign in';
       }
     });
   </script>

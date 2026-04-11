@@ -33,7 +33,7 @@
   // ─── Clock ────────────────────────────────────────────────────────────────
   function updateClock() {
     const now = new Date();
-    currentTime.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    currentTime.textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
   updateClock();
   setInterval(updateClock, 1000);
@@ -79,7 +79,7 @@
     try {
       const data = await apiFetch('/api/bouquets');
       const bouquets = data.bouquets || [];
-      bouquetSelect.innerHTML = '<option value="">Bouquet auswählen…</option>';
+      bouquetSelect.innerHTML = '<option value="">Select bouquet…</option>';
       bouquets.forEach(([ref, name]) => {
         const opt = document.createElement('option');
         opt.value = ref;
@@ -87,7 +87,7 @@
         bouquetSelect.appendChild(opt);
       });
     } catch (e) {
-      bouquetSelect.innerHTML = '<option value="">Fehler beim Laden</option>';
+      bouquetSelect.innerHTML = '<option value="">Failed to load</option>';
       console.error('Bouquet load error:', e);
     }
   }
@@ -98,13 +98,13 @@
 
   // ─── Channels ─────────────────────────────────────────────────────────────
   async function loadChannels(bouquetRef) {
-    channelList.innerHTML = '<div class="list-placeholder">Lade Kanäle…</div>';
+    channelList.innerHTML = '<div class="list-placeholder">Loading channels…</div>';
     try {
       const data = await apiFetch(`/api/services?sRef=${encodeURIComponent(bouquetRef)}`);
       const services = data.services || [];
 
       if (services.length === 0) {
-        channelList.innerHTML = '<div class="list-placeholder">Keine Kanäle gefunden</div>';
+        channelList.innerHTML = '<div class="list-placeholder">No channels found</div>';
         return;
       }
 
@@ -126,7 +126,7 @@
       // Load short EPG for channel list (debounced / lightweight)
       loadChannelListEpg(services.slice(0, 40));
     } catch (e) {
-      channelList.innerHTML = `<div class="list-placeholder">Fehler: ${escHtml(e.message)}</div>`;
+      channelList.innerHTML = `<div class="list-placeholder">Error: ${escHtml(e.message)}</div>`;
     }
   }
 
@@ -205,7 +205,7 @@
 
   // ─── EPG Side Panel ───────────────────────────────────────────────────────
   async function loadEpgPanel(sRef, channelName) {
-    epgContent.innerHTML = '<div class="epg-empty">Lade EPG…</div>';
+    epgContent.innerHTML = '<div class="epg-empty">Loading EPG…</div>';
     nowPlaying.style.display = 'none';
 
     try {
@@ -213,7 +213,7 @@
       const events = (data.events || []).slice(0, 20);
 
       if (events.length === 0) {
-        epgContent.innerHTML = '<div class="epg-empty">Keine EPG-Daten verfügbar</div>';
+        epgContent.innerHTML = '<div class="epg-empty">No EPG data available</div>';
         return;
       }
 
@@ -235,7 +235,7 @@
           <div class="epg-event-time">${timeStr}</div>
           <div class="epg-event-title">${escHtml(evt.title || '–')}</div>
           ${evt.shortdesc ? `<div class="epg-event-desc">${escHtml(evt.shortdesc)}</div>` : ''}
-          <div class="epg-event-duration">${durMin} Min.</div>
+          <div class="epg-event-duration">${durMin} min</div>
         `;
         epgContent.appendChild(div);
 
@@ -246,7 +246,7 @@
         }
       });
     } catch (e) {
-      epgContent.innerHTML = `<div class="epg-empty">Fehler: ${escHtml(e.message)}</div>`;
+      epgContent.innerHTML = `<div class="epg-empty">Error: ${escHtml(e.message)}</div>`;
     }
   }
 
@@ -258,7 +258,7 @@
     const end = start + evt.duration_sec;
     const startDate = new Date(start * 1000);
     const endDate = new Date(end * 1000);
-    npTime.textContent = `${fmtTime(startDate)} – ${fmtTime(endDate)}  (${Math.round(evt.duration_sec / 60)} Min.)`;
+    npTime.textContent = `${fmtTime(startDate)} – ${fmtTime(endDate)}  (${Math.round(evt.duration_sec / 60)} min)`;
     const pct = ((now - start) / evt.duration_sec) * 100;
     npProgress.style.width = `${Math.min(100, Math.max(0, pct))}%`;
   }
@@ -295,7 +295,7 @@
   }
 
   function fmtTime(date) {
-    return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
 
   function sanitizeId(str) {
