@@ -166,7 +166,7 @@
     }
     videoEl.src = '';
 
-    const streamUrl = `/stream/${encodeURIComponent(sRef)}`;
+    const streamUrl = `${window.location.origin}/stream/${encodeURIComponent(sRef)}`;
 
     if (mpegts.isSupported()) {
       player = mpegts.createPlayer({
