@@ -1,0 +1,18 @@
+{
+  "name": "e2streamhub",
+  "version": "1.0.0",
+  "description": "Web-based streaming interface for Enigma2 receivers (OpenWebif)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

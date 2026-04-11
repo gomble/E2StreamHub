@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E2StreamHub</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+
+<!-- ─── Top Bar ──────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">📺</span>
+    <span class="topbar-title">E2StreamHub</span>
+  </div>
+  <nav class="topbar-nav">
+    <button class="nav-btn active" data-view="player">Player</button>
+    <button class="nav-btn" data-view="epg">EPG Guide</button>
+  </nav>
+  <div class="topbar-right">
+    <span class="status-dot" id="statusDot" title="Empfänger Status"></span>
+    <span class="current-time" id="currentTime"></span>
+    <button class="logout-btn" id="logoutBtn">Abmelden</button>
+  </div>
+</header>
+
+<!-- ─── Player View ──────────────────────────────────────────────────────── -->
+<div class="view active" id="viewPlayer">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <select class="bouquet-select" id="bouquetSelect">
+        <option value="">Bouquet laden…</option>
+      </select>
+    </div>
+    <div class="channel-list" id="channelList">
+      <div class="list-placeholder">Bitte Bouquet auswählen</div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="player-area">
+      <div class="video-wrapper">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="video-overlay" id="videoOverlay">
+          <div class="overlay-icon">▶</div>
+          <div class="overlay-text">Kanal auswählen</div>
+        </div>
+        <div class="buffering-spinner" id="bufferingSpinner"></div>
+      </div>
+
+      <div class="now-playing" id="nowPlaying" style="display:none">
+        <div class="now-playing-channel" id="npChannel"></div>
+        <div class="now-playing-info">
+          <div class="now-playing-title" id="npTitle"></div>
+          <div class="now-playing-time" id="npTime"></div>
+          <div class="now-playing-progress">
+            <div class="progress-bar" id="npProgress"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="epg-panel" id="epgPanel">
+      <div class="epg-panel-header">Programminfo</div>
+      <div class="epg-panel-content" id="epgContent">
+        <div class="epg-empty">Kein Kanal ausgewählt</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ─── EPG Guide View ───────────────────────────────────────────────────── -->
+<div class="view" id="viewEpg">
+  <div class="epg-guide-header">
+    <div class="epg-guide-controls">
+      <select class="bouquet-select" id="epgBouquetSelect">
+        <option value="">Bouquet auswählen…</option>
+      </select>
+      <button class="btn-secondary" id="epgLoadBtn">EPG laden</button>
+    </div>
+    <div class="epg-time-nav">
+      <button class="btn-icon" id="epgPrevBtn">◀</button>
+      <span class="epg-time-range" id="epgTimeRange"></span>
+      <button class="btn-icon" id="epgNextBtn">▶</button>
+      <button class="btn-secondary" id="epgNowBtn">Jetzt</button>
+    </div>
+  </div>
+
+  <div class="epg-guide-container">
+    <div class="epg-guide-inner" id="epgGuide">
+      <div class="epg-guide-placeholder">Bouquet auswählen und EPG laden</div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/epg-timeline.js"></script>
+</body>
+</html>

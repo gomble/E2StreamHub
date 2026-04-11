@@ -1,0 +1,25 @@
+services:
+  e2streamhub:
+    build: .
+    container_name: e2streamhub
+    ports:
+      - "3000:3000"
+    environment:
+      # IP-Adresse / Hostname deines Enigma2-Empfängers (Gigablue Quad 4K Pro)
+      - ENIGMA2_HOST=192.168.1.100
+      # OpenWebif HTTP-Port (Standard: 80)
+      - ENIGMA2_PORT=80
+      # Streaming-Port (Standard: 8001)
+      - ENIGMA2_STREAM_PORT=8001
+      # Zugangsdaten des Empfängers (leer lassen wenn keins gesetzt)
+      - ENIGMA2_USER=
+      - ENIGMA2_PASSWORD=
+      # Login-Daten für das Web-Interface (ändern!)
+      - APP_USERNAME=admin
+      - APP_PASSWORD=admin
+      # Zufälliger Secret für Sessions (ändern!)
+      - SESSION_SECRET=bitte-aendern-32-zeichen-zufaellig
+    restart: unless-stopped
+    # Netzwerk-Modus: host ermöglicht direkten Zugriff auf den Empfänger
+    # Alternativ: bridge und sicherstellen dass ENIGMA2_HOST erreichbar ist
+    # network_mode: host

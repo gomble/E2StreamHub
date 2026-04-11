@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E2StreamHub – Login</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .login-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 12px;
+      letter-spacing: -.5px;
+    }
+
+    .logo p {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 15px;
+      padding: 12px 14px;
+      transition: border-color .2s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #e50914;
+    }
+
+    .field {
+      margin-bottom: 20px;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      background: #e50914;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 13px;
+      cursor: pointer;
+      transition: background .2s, opacity .2s;
+      margin-top: 8px;
+    }
+
+    button[type="submit"]:hover { background: #c0060f; }
+    button[type="submit"]:disabled { opacity: .5; cursor: not-allowed; }
+
+    .error {
+      background: rgba(229, 9, 20, .15);
+      border: 1px solid rgba(229, 9, 20, .4);
+      border-radius: 8px;
+      color: #ff6b6b;
+      font-size: 13px;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-icon">📺</div>
+      <h1>E2StreamHub</h1>
+      <p>Enigma2 Web Streaming</p>
+    </div>
+
+    <div class="error" id="errorMsg">Ungültige Anmeldedaten</div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="username">Benutzername</label>
+        <input type="text" id="username" name="username" autocomplete="username" autofocus required />
+      </div>
+      <div class="field">
+        <label for="password">Passwort</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" id="submitBtn">Anmelden</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const errorMsg = document.getElementById('errorMsg');
+      btn.disabled = true;
+      btn.textContent = 'Anmelden…';
+      errorMsg.classList.remove('visible');
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          errorMsg.classList.add('visible');
+          btn.disabled = false;
+          btn.textContent = 'Anmelden';
+        }
+      } catch {
+        errorMsg.textContent = 'Server nicht erreichbar';
+        errorMsg.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Anmelden';
+      }
+    });
+  </script>
+</body>
+</html>
