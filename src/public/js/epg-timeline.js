@@ -204,7 +204,7 @@
     document.getElementById('viewPlayer').classList.add('active');
 
     // Find channel item in sidebar and select it
-    const sideItem = document.querySelector(`.channel-item[data-sref="${CSS.escape(sRef)}"]`);
+    const sideItem = [...document.querySelectorAll('.channel-item')].find(el => el.dataset.sref === sRef) || null;
     window._app.tuneChannel(sRef, name, sideItem);
   }
 
