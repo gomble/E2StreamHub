@@ -125,9 +125,11 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
 // This avoids CORS issues and keeps receiver credentials server-side.
 
 app.get('/stream/*', requireAuth, (req, res) => {
-  // Everything after /stream/ is the service reference
-  const sRef = req.params[0];
+  // Decode the service reference (the client sends it URL-encoded)
+  const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
+
+  console.log(`Stream request: ${sRef}`);
 
   const reqOptions = {
     hostname: ENIGMA2_HOST,
@@ -142,23 +144,46 @@ app.get('/stream/*', requireAuth, (req, res) => {
     reqOptions.headers['Authorization'] = `Basic ${creds}`;
   }
 
+  let headersSentByUs = false;
+
   const streamReq = http.request(reqOptions, (streamRes) => {
-    res.setHeader('Content-Type', streamRes.headers['content-type'] || 'video/mp2t');
+    const statusCode = streamRes.statusCode || 200;
+
+    // If receiver returns non-200, report it cleanly instead of forwarding HTML error pages
+    if (statusCode !== 200) {
+      console.error(`Receiver returned HTTP ${statusCode} for stream`);
+      streamRes.resume(); // drain to free socket
+      if (!res.headersSent) {
+        res.status(502).json({ error: `Receiver returned HTTP ${statusCode}` });
+      }
+      return;
+    }
+
+    headersSentByUs = true;
+    res.setHeader('Content-Type', 'video/mp2t');
     res.setHeader('Cache-Control', 'no-cache, no-store');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.status(streamRes.statusCode || 200);
+    res.status(200);
+
     streamRes.pipe(res);
 
     streamRes.on('error', (err) => {
       console.error('Stream response error:', err.message);
       if (!res.writableEnded) res.end();
     });
+
+    streamRes.on('close', () => {
+      if (!res.writableEnded) res.end();
+    });
   });
 
   streamReq.on('error', (err) => {
     console.error('Stream request error:', err.message);
-    if (!res.headersSent) res.status(502).json({ error: 'Stream unavailable' });
-    else if (!res.writableEnded) res.end();
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Receiver unreachable' });
+    } else if (!res.writableEnded) {
+      res.end();
+    }
   });
 
   req.on('close', () => {
