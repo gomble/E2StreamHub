@@ -217,18 +217,23 @@ app.get('/stream/*', requireAuth, async (req, res) => {
     '-loglevel', 'warning',
     '-fflags', '+nobuffer+discardcorrupt+genpts',
     '-err_detect', 'ignore_err',
-    '-probesize', '1000000',
-    '-analyzeduration', '1000000',
+    '-probesize', '5000000',
+    '-analyzeduration', '5000000',
     '-i', sourceUrl,
   ];
 
   if (programNum) {
-    ffArgs.push('-map', `0:p:${programNum}`);
+    ffArgs.push(
+      '-map', `0:p:${programNum}:v?`,
+      '-map', `0:p:${programNum}:a?`
+    );
   } else {
-    ffArgs.push('-map', '0');
+    ffArgs.push('-map', '0:v?', '-map', '0:a?');
   }
 
   ffArgs.push(
+    '-dn',
+    '-sn',
     '-c', 'copy',
     '-ignore_unknown',
     '-f', 'mpegts',
