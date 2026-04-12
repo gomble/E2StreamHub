@@ -15,6 +15,7 @@ const ENIGMA2_PASSWORD = process.env.ENIGMA2_PASSWORD || '';
 const APP_USERNAME = process.env.APP_USERNAME || 'admin';
 const APP_PASSWORD = process.env.APP_PASSWORD || 'admin';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'e2streamhub-change-this-secret';
+const FFMPEG_FORCE_VIDEO_TRANSCODE = String(process.env.FFMPEG_FORCE_VIDEO_TRANSCODE || '').toLowerCase() === 'true';
 
 const enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
 const enigmaAuth = ENIGMA2_USER
@@ -232,11 +233,32 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   ffArgs.push(
     '-dn',
     '-sn',
-    '-c:v', 'copy',
-    '-c:a', 'aac',
-    '-ac', '2',
-    '-ar', '48000',
-    '-b:a', '128k',
+  );
+
+  if (FFMPEG_FORCE_VIDEO_TRANSCODE) {
+    ffArgs.push(
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-tune', 'zerolatency',
+      '-g', '50',
+      '-keyint_min', '50',
+      '-x264-params', 'scenecut=0:open_gop=0',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '48000',
+      '-b:a', '128k'
+    );
+  } else {
+    ffArgs.push(
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '48000',
+      '-b:a', '128k'
+    );
+  }
+
+  ffArgs.push(
     '-ignore_unknown',
     '-f', 'mpegts',
     '-mpegts_flags', '+resend_headers',

@@ -19,6 +19,7 @@ services:
       - APP_PASSWORD=admin
       # Random secret for session signing (change this!)
       - SESSION_SECRET=please-change-this-to-a-random-32-char-string
+      - FFMPEG_FORCE_VIDEO_TRANSCODE=false
     restart: unless-stopped
     # Network mode: use "host" on Linux to allow direct LAN access to the receiver.
     # In bridge mode make sure ENIGMA2_HOST is reachable from the container.
