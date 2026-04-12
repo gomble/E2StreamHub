@@ -155,9 +155,10 @@ app.get('/stream/*', requireAuth, (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    '-fflags', '+nobuffer+discardcorrupt',
-    '-probesize', '1048576',       // 1 MB — enough to detect h264/ac3 params
-    '-analyzeduration', '2000000', // 2 seconds analysis
+    // Give ffmpeg enough data to find a full IDR frame before starting output
+    '-fflags', '+nobuffer+discardcorrupt+genpts',
+    '-probesize', '5000000',        // 5 MB
+    '-analyzeduration', '5000000',  // 5 seconds
     '-i', sourceUrl,
   ];
 
@@ -169,9 +170,15 @@ app.get('/stream/*', requireAuth, (req, res) => {
   }
 
   ffArgs.push(
-    '-c', 'copy',       // no re-encoding — just re-mux
-    '-f', 'mpegts',     // output format
-    'pipe:1',           // write to stdout
+    '-c:v', 'copy',
+    '-c:a', 'copy',
+    '-c:s', 'copy',
+    '-copyts',
+    '-f', 'mpegts',
+    // Resend PAT/PMT frequently so the browser player syncs fast
+    '-mpegts_flags', 'resend_headers+pat_pmt_at_frames',
+    '-avoid_negative_ts', 'make_zero',
+    'pipe:1',
   );
 
   const ff = spawn('ffmpeg', ffArgs);
