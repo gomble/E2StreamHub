@@ -215,20 +215,18 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    '-fflags', '+nobuffer+discardcorrupt+genpts',
+    '-fflags', '+nobuffer+genpts',
     '-err_detect', 'ignore_err',
-    '-probesize', '5000000',
-    '-analyzeduration', '5000000',
+    '-probesize', '10000000',
+    '-analyzeduration', '10000000',
     '-i', sourceUrl,
   ];
 
   if (programNum) {
-    ffArgs.push(
-      '-map', `0:p:${programNum}:v?`,
-      '-map', `0:p:${programNum}:a?`
-    );
+    ffArgs.push('-map', `0:p:${programNum}:v:0?`);
+    ffArgs.push('-map', `0:p:${programNum}:a:0?`);
   } else {
-    ffArgs.push('-map', '0:v?', '-map', '0:a?');
+    ffArgs.push('-map', '0:v:0?', '-map', '0:a:0?');
   }
 
   ffArgs.push(
