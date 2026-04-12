@@ -133,36 +133,82 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
 });
 
 // ─── Stream proxy ─────────────────────────────────────────────────────────────
-// Port 8001 on Enigma2 delivers the full transponder (MPTS – multiple programmes).
-// ffmpeg selects the desired programme by number and re-muxes it to a clean SPTS
-// before forwarding it to the browser. This is exactly what VLC does internally
-// via the #EXTVLCOPT:program= directive in M3U files.
+// Strategy:
+//  1. Ask OpenWebif for the stream URL via /web/stream.m3u — this gives the
+//     correct single-program URL (e.g. port 17999) that already has program
+//     selection done server-side. Proxy it directly (no ffmpeg needed).
+//  2. Fall back to ffmpeg extracting the program from the raw MPTS on port 8001.
 
-app.get('/stream/*', requireAuth, (req, res) => {
+async function resolveSptsUrl(sRef) {
+  try {
+    const config = { params: { ref: sRef }, responseType: 'text', timeout: 5000 };
+    if (enigmaAuth) config.auth = enigmaAuth;
+    const response = await axios.get(`${enigmaBase}/web/stream.m3u`, config);
+    const m3u = response.data || '';
+    for (const line of m3u.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        const url = new URL(trimmed);
+        // Replace hostname — Docker often can't resolve Fritz.Box mDNS names
+        const port = url.port || '80';
+        const resolved = `http://${ENIGMA2_HOST}:${port}${url.pathname}`;
+        console.log(`stream.m3u resolved: ${resolved}`);
+        return resolved;
+      }
+    }
+  } catch (e) {
+    console.warn('stream.m3u lookup failed:', e.message);
+  }
+  return null;
+}
+
+app.get('/stream/*', requireAuth, async (req, res) => {
   const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
   const programNum = getProgramNumber(sRef);
-  let sourceUrl = `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+  console.log(`Stream request: ${sRef}  program=${programNum}`);
 
-  // Embed HTTP basic auth credentials into the URL for ffmpeg if needed
+  res.setHeader('Content-Type', 'video/mp2t');
+  res.setHeader('Cache-Control', 'no-cache, no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  // ── Strategy 1: OpenWebif streaming relay (SPTS, no ffmpeg needed) ──────────
+  const sptsUrl = await resolveSptsUrl(sRef);
+
+  if (sptsUrl) {
+    try {
+      const axiosConfig = { responseType: 'stream', timeout: 10000 };
+      if (enigmaAuth) axiosConfig.auth = enigmaAuth;
+      const upstream = await axios.get(sptsUrl, axiosConfig);
+      console.log(`Proxying SPTS from ${sptsUrl}  HTTP ${upstream.status}`);
+      upstream.data.pipe(res);
+      upstream.data.on('error', () => { if (!res.writableEnded) res.end(); });
+      req.on('close', () => upstream.data.destroy());
+      return;
+    } catch (e) {
+      console.warn('SPTS proxy failed, falling back to ffmpeg:', e.message);
+    }
+  }
+
+  // ── Strategy 2: ffmpeg extracts the program from the MPTS on port 8001 ──────
+  let sourceUrl = `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
   if (ENIGMA2_USER) {
     sourceUrl = `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
   }
 
-  console.log(`Stream: ${sRef}  program=${programNum}  src=${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}`);
+  console.log(`ffmpeg fallback: ${sourceUrl}  program=${programNum}`);
 
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    // Give ffmpeg enough data to find a full IDR frame before starting output
     '-fflags', '+nobuffer+discardcorrupt+genpts',
-    '-probesize', '5000000',        // 5 MB
-    '-analyzeduration', '5000000',  // 5 seconds
+    '-err_detect', 'ignore_err',
+    '-probesize', '1000000',
+    '-analyzeduration', '1000000',
     '-i', sourceUrl,
   ];
 
-  // Select specific program (service ID) from the MPTS
   if (programNum) {
     ffArgs.push('-map', `0:p:${programNum}`);
   } else {
@@ -170,28 +216,21 @@ app.get('/stream/*', requireAuth, (req, res) => {
   }
 
   ffArgs.push(
-    '-c:v', 'copy',
-    '-c:a', 'copy',
-    '-c:s', 'copy',
-    '-copyts',
+    '-c', 'copy',
+    '-ignore_unknown',
     '-f', 'mpegts',
-    // Resend PAT/PMT frequently so the browser player syncs fast
-    '-mpegts_flags', 'resend_headers+pat_pmt_at_frames',
+    '-mpegts_flags', '+resend_headers',
     '-avoid_negative_ts', 'make_zero',
     'pipe:1',
   );
 
   const ff = spawn('ffmpeg', ffArgs);
 
-  res.setHeader('Content-Type', 'video/mp2t');
-  res.setHeader('Cache-Control', 'no-cache, no-store');
-  res.setHeader('X-Accel-Buffering', 'no');
-
   ff.stdout.pipe(res);
 
   ff.stderr.on('data', (data) => {
     const msg = data.toString().trim();
-    if (msg) console.error(`ffmpeg [${sRef.substring(0, 20)}]: ${msg}`);
+    if (msg) console.error(`ffmpeg: ${msg}`);
   });
 
   ff.on('error', (err) => {
@@ -205,9 +244,7 @@ app.get('/stream/*', requireAuth, (req, res) => {
     if (!res.writableEnded) res.end();
   });
 
-  req.on('close', () => {
-    ff.kill('SIGTERM');
-  });
+  req.on('close', () => ff.kill('SIGTERM'));
 });
 
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
