@@ -155,11 +155,9 @@ app.get('/stream/*', requireAuth, (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    // Low-latency input flags
-    '-fflags', 'nobuffer',
-    '-flags', 'low_delay',
-    '-probesize', '32768',
-    '-analyzeduration', '0',
+    '-fflags', '+nobuffer+discardcorrupt',
+    '-probesize', '1048576',       // 1 MB — enough to detect h264/ac3 params
+    '-analyzeduration', '2000000', // 2 seconds analysis
     '-i', sourceUrl,
   ];
 
