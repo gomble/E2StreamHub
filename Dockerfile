@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# ffmpeg is used server-side to extract a single program from MPTS streams
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 # Install dependencies first (better layer caching)
