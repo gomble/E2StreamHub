@@ -175,9 +175,12 @@
         isLive: true,
       }, {
         enableWorker: true,
+        enableStashBuffer: false,
+        stashInitialSize: 128,
+        lazyLoad: false,
         liveBufferLatencyChasing: true,
-        liveBufferLatencyMaxLatency: 3.0,
-        liveBufferLatencyMinRemain: 0.5,
+        liveBufferLatencyMaxLatency: 1.5,
+        liveBufferLatencyMinRemain: 0.15,
       });
 
       player.attachMediaElement(videoEl);

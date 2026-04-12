@@ -20,6 +20,9 @@ services:
       # Random secret for session signing (change this!)
       - SESSION_SECRET=please-change-this-to-a-random-32-char-string
       - FFMPEG_FORCE_VIDEO_TRANSCODE=false
+      - FFMPEG_PROBESIZE=10000000
+      - FFMPEG_ANALYZEDURATION=10000000
+      - FFMPEG_TRANSCODE_PRESET=veryfast
     restart: unless-stopped
     # Network mode: use "host" on Linux to allow direct LAN access to the receiver.
     # In bridge mode make sure ENIGMA2_HOST is reachable from the container.
