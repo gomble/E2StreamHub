@@ -173,10 +173,23 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  // ── Strategy 1: OpenWebif streaming relay (SPTS, no ffmpeg needed) ──────────
   const sptsUrl = await resolveSptsUrl(sRef);
 
+  let canDirectRelay = false;
   if (sptsUrl) {
+    try {
+      const parsed = new URL(sptsUrl);
+      const relayPort = parseInt(parsed.port || '80', 10);
+      canDirectRelay = relayPort !== ENIGMA2_STREAM_PORT;
+      if (!canDirectRelay) {
+        console.log(`Skipping direct relay for port ${relayPort}; using ffmpeg program mapping`);
+      }
+    } catch {
+      canDirectRelay = false;
+    }
+  }
+
+  if (sptsUrl && canDirectRelay) {
     try {
       const axiosConfig = { responseType: 'stream', timeout: 10000 };
       if (enigmaAuth) axiosConfig.auth = enigmaAuth;
