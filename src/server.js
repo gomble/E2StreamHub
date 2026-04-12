@@ -234,7 +234,11 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   ffArgs.push(
     '-dn',
     '-sn',
-    '-c', 'copy',
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    '-ac', '2',
+    '-ar', '48000',
+    '-b:a', '128k',
     '-ignore_unknown',
     '-f', 'mpegts',
     '-mpegts_flags', '+resend_headers',
