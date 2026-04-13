@@ -25,7 +25,14 @@ services:
       - FFMPEG_TRANSCODE_PRESET=veryfast
       - HLS_SEGMENT_SECONDS=2
       - HLS_LIST_SIZE=4
+    volumes:
+      # Named volume for HLS sessions — avoids overlay-fs race conditions and
+      # survives container restarts without filling the container layer.
+      - hls-sessions:/app/hls-sessions
     restart: unless-stopped
     # Network mode: use "host" on Linux to allow direct LAN access to the receiver.
     # In bridge mode make sure ENIGMA2_HOST is reachable from the container.
     # network_mode: host
+
+volumes:
+  hls-sessions:

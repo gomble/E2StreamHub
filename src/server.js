@@ -33,6 +33,10 @@ const enigmaAuth = ENIGMA2_USER
 // Use a persistent path inside the container (not /tmp which Docker may flush)
 const hlsRootDir = path.join(__dirname, '..', 'hls-sessions');
 const hlsSessions = new Map();
+// Clean up any leftover sessions from a previous crash/restart
+try {
+  fs.rmSync(hlsRootDir, { recursive: true, force: true });
+} catch {}
 try {
   fs.mkdirSync(hlsRootDir, { recursive: true });
 } catch {}
@@ -116,6 +120,17 @@ function touchHlsSession(sessionId) {
   sess.lastSeen = Date.now();
   if (sess.cleanupTimer) clearTimeout(sess.cleanupTimer);
   sess.cleanupTimer = setTimeout(() => cleanupHlsSession(sessionId), 120000);
+  // Delete segments no longer in the HLS window. We do this in Node.js (not via
+  // ffmpeg's delete_segments flag) to avoid overlay-filesystem race conditions.
+  try {
+    const segs = fs.readdirSync(sess.dir)
+      .filter(f => /^seg_\d+\.ts$/.test(f))
+      .sort();
+    const keep = HLS_LIST_SIZE + 2; // playlist window + small safety buffer
+    segs.slice(0, Math.max(0, segs.length - keep)).forEach(f => {
+      try { fs.unlinkSync(path.join(sess.dir, f)); } catch {}
+    });
+  } catch {}
 }
 
 function buildSourceUrl(sRef) {
@@ -131,9 +146,11 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
     '-loglevel', 'warning',
     '-fflags', '+nobuffer+genpts+discardcorrupt',
     '-err_detect', 'ignore_err',
+    '-max_error_rate', '1.0',      // tolerate all decode errors; never crash on corrupt stream
     '-probesize', FFMPEG_PROBESIZE,
     '-analyzeduration', FFMPEG_ANALYZEDURATION,
     '-i', sourceUrl,
+    '-ignore_unknown',             // suppress unknown private-data stream warnings
   ];
 
   if (programNum) {
@@ -162,12 +179,15 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
     '-b:a', '128k'
   );
 
+  // NOTE: do NOT use delete_segments — it causes race conditions on Docker's
+  // overlay filesystem when ffmpeg deletes seg N while writing seg N+4.
+  // Old segments are cleaned up by touchHlsSession() in Node.js instead.
   args.push(
     '-f', 'hls',
     '-hls_time', String(HLS_SEGMENT_SECONDS),
     '-hls_init_time', '0',
     '-hls_list_size', String(HLS_LIST_SIZE),
-    '-hls_flags', 'delete_segments+append_list+omit_endlist',
+    '-hls_flags', 'append_list+omit_endlist',
     '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', path.join(path.dirname(outPlaylist), 'seg_%06d.ts'),
     outPlaylist
@@ -250,7 +270,10 @@ app.post('/hls/start', requireAuth, async (req, res) => {
       const msg = data.toString().trim();
       if (msg) console.error(`ffmpeg(hls): ${msg}`);
     });
-    ff.on('close', () => cleanupHlsSession(sessionId));
+    ff.on('close', (code, signal) => {
+      if (code && code !== 255) console.error(`ffmpeg(hls) exited: code=${code} signal=${signal} session=${sessionId}`);
+      cleanupHlsSession(sessionId);
+    });
 
     hlsSessions.set(sessionId, {
       ffmpeg: ff,
