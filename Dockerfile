@@ -12,11 +12,13 @@ RUN npm install --omit=dev
 # Copy source
 COPY src/ ./src/
 
-# Download mpegts.js to serve locally (avoids CDN tracking prevention in browsers)
-RUN wget -q -O src/public/js/mpegts.js \
-    https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js
-RUN wget -q -O src/public/js/hls.min.js \
-    https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js
+# Download client-side player libraries to serve locally
+RUN wget -q --tries=3 --timeout=30 -O src/public/js/mpegts.js \
+    https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js && \
+    echo "mpegts.js downloaded: $(wc -c < src/public/js/mpegts.js) bytes"
+RUN wget -q --tries=3 --timeout=30 -O src/public/js/hls.min.js \
+    https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js && \
+    echo "hls.min.js downloaded: $(wc -c < src/public/js/hls.min.js) bytes"
 
 EXPOSE 3000
 
