@@ -30,7 +30,8 @@ const enigmaAuth = ENIGMA2_USER
   ? { username: ENIGMA2_USER, password: ENIGMA2_PASSWORD }
   : null;
 
-const hlsRootDir = path.join(os.tmpdir(), 'e2streamhub-hls');
+// Use a persistent path inside the container (not /tmp which Docker may flush)
+const hlsRootDir = path.join(__dirname, '..', 'hls-sessions');
 const hlsSessions = new Map();
 try {
   fs.mkdirSync(hlsRootDir, { recursive: true });
@@ -144,28 +145,22 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
 
   args.push('-dn', '-sn');
 
-  if (FFMPEG_FORCE_VIDEO_TRANSCODE) {
-    args.push(
-      '-c:v', 'libx264',
-      '-preset', FFMPEG_TRANSCODE_PRESET,
-      '-tune', 'zerolatency',
-      '-g', '50',
-      '-keyint_min', '50',
-      '-x264-params', 'scenecut=0:open_gop=0',
-      '-c:a', 'aac',
-      '-ac', '2',
-      '-ar', '48000',
-      '-b:a', '128k'
-    );
-  } else {
-    args.push(
-      '-c:v', 'copy',
-      '-c:a', 'aac',
-      '-ac', '2',
-      '-ar', '48000',
-      '-b:a', '128k'
-    );
-  }
+  // HLS always requires transcoded video: copy-mode cannot guarantee keyframe
+  // alignment or inject missing SPS/PPS when joining a live stream mid-GOP.
+  // FFMPEG_FORCE_VIDEO_TRANSCODE controls the preset (quality/speed trade-off);
+  // ultrafast is the default to keep latency and CPU load low.
+  args.push(
+    '-c:v', 'libx264',
+    '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
+    '-tune', 'zerolatency',
+    '-g', '50',
+    '-keyint_min', '25',
+    '-sc_threshold', '0',
+    '-c:a', 'aac',
+    '-ac', '2',
+    '-ar', '48000',
+    '-b:a', '128k'
+  );
 
   args.push(
     '-f', 'hls',
@@ -271,9 +266,17 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     // immediately start buffering instead of getting a 202 "warming up" response.
     const seg0Path = path.join(sessionDir, 'seg_000000.ts');
     const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
+    let clientGone = false;
+    req.on('close', () => { clientGone = true; });
+
+    while (Date.now() < deadline && !clientGone) {
       if (fs.existsSync(playlistPath) && fs.existsSync(seg0Path)) break;
       await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
+    if (clientGone) {
+      cleanupHlsSession(sessionId);
+      return;
     }
 
     if (!fs.existsSync(playlistPath)) {
