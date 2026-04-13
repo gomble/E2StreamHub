@@ -122,7 +122,10 @@
           <span class="channel-name">${escHtml(svc.servicename)}</span>
           <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
         `;
-        item.addEventListener('click', () => tuneChannel(svc.servicereference, svc.servicename, item));
+        item.addEventListener('click', () => {
+          clearTimeout(item._tuneTimer);
+          item._tuneTimer = setTimeout(() => tuneChannel(svc.servicereference, svc.servicename, item), 250);
+        });
         channelList.appendChild(item);
       });
 

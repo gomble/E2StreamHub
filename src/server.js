@@ -513,24 +513,41 @@ app.get('/stream/*', requireAuth, async (req, res) => {
 // No files on disk, no session management — the browser consumes it via MSE.
 // Supported on all modern browsers including iOS Safari 13+ (MSE).
 
-// Track active ffmpeg processes per sRef so a rapid channel switch doesn't
-// race against the previous process still holding the receiver's stream port.
+// Settle chain for fMP4 streams.
+// Each request waits for the previous one's kill+settle to complete before
+// spawning its own ffmpeg. This prevents the receiver's stream port from being
+// held by the old process when the new connection arrives.
+// resolveMySettle() is called only AFTER registering the new process in the Map
+// so that a concurrent request always sees — and can kill — the latest process.
+let fmp4LastSettle = Promise.resolve();
 const activeFmp4Streams = new Map(); // sRef -> ChildProcess
 
 app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
-  // If there is already an ffmpeg process streaming this sRef, kill it and
-  // wait for the receiver to release the connection before starting a new one.
-  const existing = activeFmp4Streams.get(sRef);
-  if (existing) {
-    activeFmp4Streams.delete(sRef);
-    existing.kill('SIGTERM');
-    await new Promise(r => existing.once('close', r));
-    // Brief pause so the receiver's HTTP server has time to close the socket.
-    await new Promise(r => setTimeout(r, 600));
+  // Insert ourselves into the settle chain.
+  let resolveMySettle;
+  const mySettle = new Promise(r => { resolveMySettle = r; });
+  const prevSettle = fmp4LastSettle;
+  fmp4LastSettle = mySettle;
+
+  // Wait for the previous request's kill+settle to finish.
+  await prevSettle;
+
+  // Bail early if the client navigated away while waiting.
+  if (req.socket.destroyed) { resolveMySettle(); return; }
+
+  // Kill every active fMP4 process (there should only ever be one).
+  let killed = false;
+  for (const [key, ff] of [...activeFmp4Streams.entries()]) {
+    ff.kill('SIGTERM');
+    activeFmp4Streams.delete(key);
+    await new Promise(r => ff.once('close', r));
+    killed = true;
   }
+  // Give the receiver time to close its HTTP connection before we reconnect.
+  if (killed) await new Promise(r => setTimeout(r, 700));
 
   const programNum = getProgramNumber(sRef);
   console.log(`fMP4 stream: ${sRef}  program=${programNum}`);
@@ -539,16 +556,22 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  // Prefer the single-program URL from OpenWebif if on a dedicated port
-  const sptsUrl = await resolveSptsUrl(sRef);
-  let sourceUrl = buildSourceUrl(sRef);
-  if (sptsUrl) {
-    try {
-      const parsed = new URL(sptsUrl);
-      if (parseInt(parsed.port || '80', 10) !== ENIGMA2_STREAM_PORT) {
-        sourceUrl = sptsUrl;
-      }
-    } catch {}
+  let sourceUrl;
+  try {
+    // Prefer the single-program URL from OpenWebif if on a dedicated port
+    const sptsUrl = await resolveSptsUrl(sRef);
+    sourceUrl = buildSourceUrl(sRef);
+    if (sptsUrl) {
+      try {
+        const parsed = new URL(sptsUrl);
+        if (parseInt(parsed.port || '80', 10) !== ENIGMA2_STREAM_PORT) {
+          sourceUrl = sptsUrl;
+        }
+      } catch {}
+    }
+  } catch (err) {
+    resolveMySettle();
+    return res.status(502).json({ error: 'Failed to resolve stream URL' });
   }
 
   const ffArgs = [
@@ -586,7 +609,11 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   );
 
   const ff = spawn('ffmpeg', ffArgs);
+  // Register BEFORE resolving so the next concurrent request sees this process
+  // and can kill it if needed.
   activeFmp4Streams.set(sRef, ff);
+  resolveMySettle(); // Unblock the next request in the chain
+
   ff.stdout.pipe(res);
 
   ff.stderr.on('data', d => {
