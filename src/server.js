@@ -539,11 +539,13 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
+    // Low probesize/analyzeduration for fast startup on live MPEG-TS streams.
+    // The source format is well-known; deep analysis only adds latency.
     '-fflags', '+nobuffer+genpts+discardcorrupt',
     '-err_detect', 'ignore_err',
     '-max_error_rate', '1.0',
-    '-probesize', FFMPEG_PROBESIZE,
-    '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-probesize', '1000000',
+    '-analyzeduration', '1000000',
     '-i', sourceUrl,
     '-ignore_unknown',
   ];
