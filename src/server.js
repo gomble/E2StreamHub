@@ -508,6 +508,85 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   req.on('close', () => ff.kill('SIGTERM'));
 });
 
+// ─── Fragmented MP4 stream ────────────────────────────────────────────────────
+// Always transcodes to H.264+AAC and outputs fragmented MP4 via stdout pipe.
+// No files on disk, no session management — the browser consumes it via MSE.
+// Supported on all modern browsers including iOS Safari 13+ (MSE).
+
+app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
+  const sRef = decodeURIComponent(req.params[0] || '');
+  if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
+
+  const programNum = getProgramNumber(sRef);
+  console.log(`fMP4 stream: ${sRef}  program=${programNum}`);
+
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Cache-Control', 'no-cache, no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  // Prefer the single-program URL from OpenWebif if on a dedicated port
+  const sptsUrl = await resolveSptsUrl(sRef);
+  let sourceUrl = buildSourceUrl(sRef);
+  if (sptsUrl) {
+    try {
+      const parsed = new URL(sptsUrl);
+      if (parseInt(parsed.port || '80', 10) !== ENIGMA2_STREAM_PORT) {
+        sourceUrl = sptsUrl;
+      }
+    } catch {}
+  }
+
+  const ffArgs = [
+    '-hide_banner',
+    '-loglevel', 'warning',
+    '-fflags', '+nobuffer+genpts+discardcorrupt',
+    '-err_detect', 'ignore_err',
+    '-max_error_rate', '1.0',
+    '-probesize', FFMPEG_PROBESIZE,
+    '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-i', sourceUrl,
+    '-ignore_unknown',
+  ];
+
+  if (programNum) {
+    ffArgs.push('-map', `0:p:${programNum}:v:0?`);
+    ffArgs.push('-map', `0:p:${programNum}:a:0?`);
+  } else {
+    ffArgs.push('-map', '0:v:0?', '-map', '0:a:0?');
+  }
+
+  ffArgs.push(
+    '-dn', '-sn',
+    '-c:v', 'libx264',
+    '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
+    '-tune', 'zerolatency',
+    '-profile:v', 'high', '-level:v', '4.0',
+    '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
+    '-c:a', 'aac', '-ac', '2', '-ar', '48000', '-b:a', '128k',
+    '-f', 'mp4',
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+    'pipe:1',
+  );
+
+  const ff = spawn('ffmpeg', ffArgs);
+  ff.stdout.pipe(res);
+
+  ff.stderr.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) console.error(`ffmpeg(fmp4): ${msg}`);
+  });
+  ff.on('error', err => {
+    console.error('ffmpeg(fmp4) spawn error:', err.message);
+    if (!res.headersSent) res.status(502).json({ error: 'Stream processing failed' });
+    else if (!res.writableEnded) res.end();
+  });
+  ff.on('close', (code) => {
+    if (code && code !== 255) console.log(`ffmpeg(fmp4) exited: ${code}`);
+    if (!res.writableEnded) res.end();
+  });
+  req.on('close', () => ff.kill('SIGTERM'));
+});
+
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
 
 app.use(express.static(path.join(__dirname, 'public')));

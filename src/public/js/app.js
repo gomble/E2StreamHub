@@ -9,9 +9,10 @@
   }
 
   // ─── State ────────────────────────────────────────────────────────────────
-  let player = null;
-  let hlsPlayer = null;
+  let player = null;        // mpegts.js player (last-resort fallback)
+  let hlsPlayer = null;     // hls.js player (old-iOS fallback)
   let hlsSessionId = null;
+  let fmp4Abort = null;     // AbortController for the primary fMP4 stream
   let currentSRef = null;
   let currentChannelName = null;
   let epgRefreshTimer = null;
@@ -149,6 +150,80 @@
     }
   }
 
+  // ─── Primary: Fragmented MP4 via MSE ─────────────────────────────────────
+  // Works on all modern browsers including iOS Safari 13+.
+  // No files on disk, no session management — just a piped HTTP stream.
+  const FMP4_MIME = 'video/mp4; codecs="avc1.640028,mp4a.40.2"';
+
+  function fmp4Supported() {
+    return !!(window.MediaSource && MediaSource.isTypeSupported(FMP4_MIME));
+  }
+
+  async function startFmp4Playback(sRef, onFatalFallback) {
+    if (!fmp4Supported()) throw new Error('MSE/fMP4 not supported');
+
+    fmp4Abort = new AbortController();
+
+    const ms = new MediaSource();
+    videoEl.src = URL.createObjectURL(ms);
+
+    await new Promise((resolve, reject) => {
+      ms.addEventListener('sourceopen', resolve, { once: true });
+      ms.addEventListener('error', () => reject(new Error('MediaSource error')), { once: true });
+    });
+
+    let sb;
+    try {
+      sb = ms.addSourceBuffer(FMP4_MIME);
+    } catch (e) {
+      throw new Error(`SourceBuffer init failed: ${e.message}`);
+    }
+
+    const waitSb = () => sb.updating
+      ? new Promise(r => sb.addEventListener('updateend', r, { once: true }))
+      : Promise.resolve();
+
+    // Feed the fMP4 byte stream into the SourceBuffer in background
+    (async () => {
+      try {
+        const resp = await fetch(`/stream-fmp4/${encodeURIComponent(sRef)}`, {
+          signal: fmp4Abort.signal,
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const reader = resp.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          await waitSb();
+
+          // Keep buffer to ~20 s to avoid QuotaExceededError
+          if (sb.buffered.length > 0 && videoEl.currentTime > 25) {
+            const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 15);
+            if (trimTo > sb.buffered.start(0) + 1) {
+              sb.remove(sb.buffered.start(0), trimTo);
+              await waitSb();
+            }
+          }
+
+          try {
+            sb.appendBuffer(value instanceof Uint8Array ? value.buffer : value);
+          } catch (appendErr) {
+            console.warn('fMP4 appendBuffer:', appendErr.message);
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return; // normal stop via stopCurrentPlayback
+        console.error('fMP4 stream error:', err.message);
+        if (onFatalFallback) onFatalFallback();
+      }
+    })();
+
+    videoEl.play().catch(() => {});
+  }
+
+  // ─── Fallback: HLS via server-side ffmpeg (old iOS / non-MSE) ────────────
   // onFatalFallback is called when HLS encounters a fatal mid-stream error.
   async function startHlsPlayback(sRef, onFatalFallback) {
     const startRes = await fetch('/hls/start', {
@@ -204,14 +279,9 @@
   }
 
   async function stopCurrentPlayback() {
-    if (player) {
-      try { player.destroy(); } catch { }
-      player = null;
-    }
-    if (hlsPlayer) {
-      try { hlsPlayer.destroy(); } catch { }
-      hlsPlayer = null;
-    }
+    if (fmp4Abort) { fmp4Abort.abort(); fmp4Abort = null; }
+    if (player) { try { player.destroy(); } catch {} player = null; }
+    if (hlsPlayer) { try { hlsPlayer.destroy(); } catch {} hlsPlayer = null; }
     if (hlsSessionId) {
       try {
         await fetch('/hls/stop', {
@@ -280,11 +350,25 @@
     videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
     videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
 
-    try {
-      await startHlsPlayback(sRef, () => tryMpegtsPlayback(sRef));
-    } catch (hlsErr) {
-      console.warn('HLS start failed, fallback to mpegts:', hlsErr);
-      tryMpegtsPlayback(sRef);
+    // Playback priority:
+    // 1. fMP4 via MSE  — no disk I/O, works on all modern browsers + iOS 13+
+    // 2. HLS           — file-based, fallback for old iOS without MSE
+    // 3. mpegts.js     — direct TS pipe, fallback if both above fail
+    if (fmp4Supported()) {
+      try {
+        await startFmp4Playback(sRef, () => tryMpegtsPlayback(sRef));
+      } catch (err) {
+        console.warn('fMP4 failed, trying mpegts:', err.message);
+        tryMpegtsPlayback(sRef);
+      }
+    } else {
+      // Old iOS Safari without MSE — use HLS
+      try {
+        await startHlsPlayback(sRef, () => tryMpegtsPlayback(sRef));
+      } catch (hlsErr) {
+        console.warn('HLS failed, trying mpegts:', hlsErr.message);
+        tryMpegtsPlayback(sRef);
+      }
     }
 
     // Load EPG for the selected channel
@@ -411,6 +495,7 @@
 
   // ─── Cleanup on page close ────────────────────────────────────────────────
   window.addEventListener('beforeunload', () => {
+    if (fmp4Abort) fmp4Abort.abort();
     if (hlsSessionId) {
       const blob = new Blob(
         [JSON.stringify({ sessionId: hlsSessionId })],
