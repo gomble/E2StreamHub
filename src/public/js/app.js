@@ -162,8 +162,9 @@
     hlsSessionId = startData.sessionId;
     const playlistUrl = startData.playlist;
 
-    // Native HLS (Safari / iOS)
-    if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    // Native HLS only for iOS Safari — it has no MSE support and can't run hls.js.
+    // Desktop Safari, Edge, Chrome all have MediaSource → use hls.js for reliability.
+    if (videoEl.canPlayType('application/vnd.apple.mpegurl') && !window.MediaSource) {
       videoEl.src = playlistUrl;
       videoEl.onerror = () => {
         console.warn('Native HLS error, trying mpegts fallback');

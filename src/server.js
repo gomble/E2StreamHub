@@ -128,7 +128,7 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
   const args = [
     '-hide_banner',
     '-loglevel', 'warning',
-    '-fflags', '+nobuffer+genpts',
+    '-fflags', '+nobuffer+genpts+discardcorrupt',
     '-err_detect', 'ignore_err',
     '-probesize', FFMPEG_PROBESIZE,
     '-analyzeduration', FFMPEG_ANALYZEDURATION,
@@ -170,8 +170,9 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
   args.push(
     '-f', 'hls',
     '-hls_time', String(HLS_SEGMENT_SECONDS),
+    '-hls_init_time', '0',
     '-hls_list_size', String(HLS_LIST_SIZE),
-    '-hls_flags', 'delete_segments+append_list+omit_endlist+independent_segments',
+    '-hls_flags', 'delete_segments+append_list+omit_endlist',
     '-hls_segment_type', 'mpegts',
     '-hls_segment_filename', path.join(path.dirname(outPlaylist), 'seg_%06d.ts'),
     outPlaylist
@@ -239,6 +240,8 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     const decodedSRef = decodeURIComponent(sRef);
     const programNum = getProgramNumber(decodedSRef);
     const sessionId = crypto.randomUUID();
+    // Re-create root in case the OS flushed /tmp between container restarts
+    fs.mkdirSync(hlsRootDir, { recursive: true });
     const sessionDir = path.join(hlsRootDir, sessionId);
     fs.mkdirSync(sessionDir, { recursive: true });
     const playlistPath = path.join(sessionDir, 'index.m3u8');
@@ -264,9 +267,18 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     });
     touchHlsSession(sessionId);
 
-    const deadline = Date.now() + 8000;
-    while (!fs.existsSync(playlistPath) && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 80));
+    // Wait until the playlist AND the first segment exist — ensures Safari/iOS can
+    // immediately start buffering instead of getting a 202 "warming up" response.
+    const seg0Path = path.join(sessionDir, 'seg_000000.ts');
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      if (fs.existsSync(playlistPath) && fs.existsSync(seg0Path)) break;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+
+    if (!fs.existsSync(playlistPath)) {
+      cleanupHlsSession(sessionId);
+      return res.status(503).json({ error: 'Stream did not start in time — channel may be unavailable' });
     }
 
     return res.json({
@@ -397,7 +409,7 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    '-fflags', '+nobuffer+genpts',
+    '-fflags', '+nobuffer+genpts+discardcorrupt',
     '-err_detect', 'ignore_err',
     '-probesize', FFMPEG_PROBESIZE,
     '-analyzeduration', FFMPEG_ANALYZEDURATION,
