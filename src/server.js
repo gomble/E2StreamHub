@@ -513,9 +513,24 @@ app.get('/stream/*', requireAuth, async (req, res) => {
 // No files on disk, no session management — the browser consumes it via MSE.
 // Supported on all modern browsers including iOS Safari 13+ (MSE).
 
+// Track active ffmpeg processes per sRef so a rapid channel switch doesn't
+// race against the previous process still holding the receiver's stream port.
+const activeFmp4Streams = new Map(); // sRef -> ChildProcess
+
 app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
+
+  // If there is already an ffmpeg process streaming this sRef, kill it and
+  // wait for the receiver to release the connection before starting a new one.
+  const existing = activeFmp4Streams.get(sRef);
+  if (existing) {
+    activeFmp4Streams.delete(sRef);
+    existing.kill('SIGTERM');
+    await new Promise(r => existing.once('close', r));
+    // Brief pause so the receiver's HTTP server has time to close the socket.
+    await new Promise(r => setTimeout(r, 600));
+  }
 
   const programNum = getProgramNumber(sRef);
   console.log(`fMP4 stream: ${sRef}  program=${programNum}`);
@@ -571,6 +586,7 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   );
 
   const ff = spawn('ffmpeg', ffArgs);
+  activeFmp4Streams.set(sRef, ff);
   ff.stdout.pipe(res);
 
   ff.stderr.on('data', d => {
@@ -579,14 +595,19 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   });
   ff.on('error', err => {
     console.error('ffmpeg(fmp4) spawn error:', err.message);
+    activeFmp4Streams.delete(sRef);
     if (!res.headersSent) res.status(502).json({ error: 'Stream processing failed' });
     else if (!res.writableEnded) res.end();
   });
   ff.on('close', (code) => {
     if (code && code !== 255) console.log(`ffmpeg(fmp4) exited: ${code}`);
+    activeFmp4Streams.delete(sRef);
     if (!res.writableEnded) res.end();
   });
-  req.on('close', () => ff.kill('SIGTERM'));
+  req.on('close', () => {
+    activeFmp4Streams.delete(sRef);
+    ff.kill('SIGTERM');
+  });
 });
 
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
