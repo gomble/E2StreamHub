@@ -2,6 +2,9 @@ const express = require('express');
 const session = require('express-session');
 const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const app = express();
@@ -19,11 +22,19 @@ const FFMPEG_FORCE_VIDEO_TRANSCODE = String(process.env.FFMPEG_FORCE_VIDEO_TRANS
 const FFMPEG_PROBESIZE = process.env.FFMPEG_PROBESIZE || '10000000';
 const FFMPEG_ANALYZEDURATION = process.env.FFMPEG_ANALYZEDURATION || '10000000';
 const FFMPEG_TRANSCODE_PRESET = process.env.FFMPEG_TRANSCODE_PRESET || 'veryfast';
+const HLS_SEGMENT_SECONDS = parseInt(process.env.HLS_SEGMENT_SECONDS || '2', 10);
+const HLS_LIST_SIZE = parseInt(process.env.HLS_LIST_SIZE || '4', 10);
 
 const enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
 const enigmaAuth = ENIGMA2_USER
   ? { username: ENIGMA2_USER, password: ENIGMA2_PASSWORD }
   : null;
+
+const hlsRootDir = path.join(os.tmpdir(), 'e2streamhub-hls');
+const hlsSessions = new Map();
+try {
+  fs.mkdirSync(hlsRootDir, { recursive: true });
+} catch {}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -85,6 +96,90 @@ function getProgramNumber(sRef) {
   return null;
 }
 
+function cleanupHlsSession(sessionId) {
+  const sess = hlsSessions.get(sessionId);
+  if (!sess) return;
+  if (sess.ffmpeg && !sess.ffmpeg.killed) {
+    sess.ffmpeg.kill('SIGTERM');
+  }
+  if (sess.cleanupTimer) clearTimeout(sess.cleanupTimer);
+  hlsSessions.delete(sessionId);
+  try {
+    fs.rmSync(sess.dir, { recursive: true, force: true });
+  } catch {}
+}
+
+function touchHlsSession(sessionId) {
+  const sess = hlsSessions.get(sessionId);
+  if (!sess) return;
+  sess.lastSeen = Date.now();
+  if (sess.cleanupTimer) clearTimeout(sess.cleanupTimer);
+  sess.cleanupTimer = setTimeout(() => cleanupHlsSession(sessionId), 120000);
+}
+
+function buildSourceUrl(sRef) {
+  if (ENIGMA2_USER) {
+    return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+  }
+  return `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+}
+
+function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
+  const args = [
+    '-hide_banner',
+    '-loglevel', 'warning',
+    '-fflags', '+nobuffer+genpts',
+    '-err_detect', 'ignore_err',
+    '-probesize', FFMPEG_PROBESIZE,
+    '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-i', sourceUrl,
+  ];
+
+  if (programNum) {
+    args.push('-map', `0:p:${programNum}:v:0?`);
+    args.push('-map', `0:p:${programNum}:a:0?`);
+  } else {
+    args.push('-map', '0:v:0?', '-map', '0:a:0?');
+  }
+
+  args.push('-dn', '-sn');
+
+  if (FFMPEG_FORCE_VIDEO_TRANSCODE) {
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', FFMPEG_TRANSCODE_PRESET,
+      '-tune', 'zerolatency',
+      '-g', '50',
+      '-keyint_min', '50',
+      '-x264-params', 'scenecut=0:open_gop=0',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '48000',
+      '-b:a', '128k'
+    );
+  } else {
+    args.push(
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-ar', '48000',
+      '-b:a', '128k'
+    );
+  }
+
+  args.push(
+    '-f', 'hls',
+    '-hls_time', String(HLS_SEGMENT_SECONDS),
+    '-hls_list_size', String(HLS_LIST_SIZE),
+    '-hls_flags', 'delete_segments+append_list+omit_endlist+independent_segments',
+    '-hls_segment_type', 'mpegts',
+    '-hls_segment_filename', path.join(path.dirname(outPlaylist), 'seg_%06d.ts'),
+    outPlaylist
+  );
+
+  return args;
+}
+
 // ─── API routes ───────────────────────────────────────────────────────────────
 
 app.get('/api/bouquets', requireAuth, async (req, res) => {
@@ -134,6 +229,89 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+app.post('/hls/start', requireAuth, async (req, res) => {
+  try {
+    const sRef = String(req.body?.sRef || '');
+    if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
+
+    const decodedSRef = decodeURIComponent(sRef);
+    const programNum = getProgramNumber(decodedSRef);
+    const sessionId = crypto.randomUUID();
+    const sessionDir = path.join(hlsRootDir, sessionId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const playlistPath = path.join(sessionDir, 'index.m3u8');
+
+    const sourceUrl = buildSourceUrl(decodedSRef);
+    const ffArgs = buildHlsArgs(sourceUrl, programNum, playlistPath);
+    console.log(`hls start: ${decodedSRef} program=${programNum} session=${sessionId}`);
+
+    const ff = spawn('ffmpeg', ffArgs);
+    ff.stderr.on('data', (data) => {
+      const msg = data.toString().trim();
+      if (msg) console.error(`ffmpeg(hls): ${msg}`);
+    });
+    ff.on('close', () => cleanupHlsSession(sessionId));
+
+    hlsSessions.set(sessionId, {
+      ffmpeg: ff,
+      dir: sessionDir,
+      playlistPath,
+      createdAt: Date.now(),
+      lastSeen: Date.now(),
+      cleanupTimer: null,
+    });
+    touchHlsSession(sessionId);
+
+    const deadline = Date.now() + 8000;
+    while (!fs.existsSync(playlistPath) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    return res.json({
+      sessionId,
+      playlist: `/hls/${sessionId}/index.m3u8`,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/hls/stop', requireAuth, (req, res) => {
+  const sessionId = String(req.body?.sessionId || '');
+  if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
+  cleanupHlsSession(sessionId);
+  return res.json({ success: true });
+});
+
+app.get('/hls/:sessionId/:file', requireAuth, (req, res) => {
+  const { sessionId, file } = req.params;
+  const sess = hlsSessions.get(sessionId);
+  if (!sess) return res.status(404).end();
+  if (file.includes('..') || file.includes('/') || file.includes('\\')) return res.status(400).end();
+
+  touchHlsSession(sessionId);
+
+  const target = path.join(sess.dir, file);
+  if (!target.startsWith(sess.dir)) return res.status(400).end();
+
+  if (!fs.existsSync(target)) {
+    if (file === 'index.m3u8') {
+      return res.status(202).type('text/plain').send('warming up');
+    }
+    return res.status(404).end();
+  }
+
+  if (file.endsWith('.m3u8')) {
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+  } else if (file.endsWith('.ts')) {
+    res.setHeader('Content-Type', 'video/mp2t');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+  }
+
+  return res.sendFile(target);
 });
 
 // ─── Stream proxy ─────────────────────────────────────────────────────────────

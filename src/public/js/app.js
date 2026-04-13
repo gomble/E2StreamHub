@@ -10,6 +10,8 @@
 
   // ─── State ────────────────────────────────────────────────────────────────
   let player = null;
+  let hlsPlayer = null;
+  let hlsSessionId = null;
   let currentSRef = null;
   let currentChannelName = null;
   let epgRefreshTimer = null;
@@ -147,8 +149,120 @@
     }
   }
 
+  // onFatalFallback is called when HLS encounters a fatal mid-stream error.
+  async function startHlsPlayback(sRef, onFatalFallback) {
+    const startRes = await fetch('/hls/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sRef }),
+    });
+    if (!startRes.ok) throw new Error(`HLS start failed: HTTP ${startRes.status}`);
+
+    const startData = await startRes.json();
+    hlsSessionId = startData.sessionId;
+    const playlistUrl = startData.playlist;
+
+    // Native HLS (Safari / iOS)
+    if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      videoEl.src = playlistUrl;
+      videoEl.onerror = () => {
+        console.warn('Native HLS error, trying mpegts fallback');
+        videoEl.onerror = null;
+        if (onFatalFallback) onFatalFallback();
+      };
+      await videoEl.play().catch(() => {});
+      return;
+    }
+
+    // hls.js (Chrome, Firefox, Edge, …)
+    if (window.Hls && window.Hls.isSupported()) {
+      hlsPlayer = new window.Hls({
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
+        lowLatencyMode: true,
+        backBufferLength: 0,
+      });
+      hlsPlayer.attachMedia(videoEl);
+      hlsPlayer.on(window.Hls.Events.MEDIA_ATTACHED, () => {
+        hlsPlayer.loadSource(playlistUrl);
+      });
+      hlsPlayer.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        videoEl.play().catch(() => {});
+      });
+      hlsPlayer.on(window.Hls.Events.ERROR, (_evt, data) => {
+        if (data?.fatal) {
+          console.warn('HLS.js fatal error, trying mpegts fallback');
+          if (onFatalFallback) onFatalFallback();
+          else showVideoError('HLS playback error. Please retry channel.');
+        }
+      });
+      return;
+    }
+
+    throw new Error('HLS not supported in this browser');
+  }
+
+  async function stopCurrentPlayback() {
+    if (player) {
+      try { player.destroy(); } catch { }
+      player = null;
+    }
+    if (hlsPlayer) {
+      try { hlsPlayer.destroy(); } catch { }
+      hlsPlayer = null;
+    }
+    if (hlsSessionId) {
+      try {
+        await fetch('/hls/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: hlsSessionId }),
+        });
+      } catch {}
+      hlsSessionId = null;
+    }
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.load();
+  }
+
+  // ─── mpegts fallback player ───────────────────────────────────────────────
+  function tryMpegtsPlayback(sRef) {
+    const mpegtsAvailable = typeof mpegts !== 'undefined' && mpegts.isSupported();
+    if (!mpegtsAvailable) {
+      showVideoError('Stream cannot be played on this browser. Try Chrome or Firefox.');
+      return;
+    }
+    const streamUrl = `${window.location.origin}/stream/${encodeURIComponent(sRef)}`;
+    player = mpegts.createPlayer({
+      type: 'mpegts',
+      url: streamUrl,
+      isLive: true,
+    }, {
+      enableWorker: true,
+      enableStashBuffer: false,
+      stashInitialSize: 128,
+      lazyLoad: false,
+      liveBufferLatencyChasing: true,
+      liveBufferLatencyMaxLatency: 1.5,
+      liveBufferLatencyMinRemain: 0.15,
+    });
+    player.attachMediaElement(videoEl);
+    player.load();
+    player.play().catch(() => {});
+    player.on(mpegts.Events.ERROR, (errType, errDetail) => {
+      console.error('mpegts error:', errType, errDetail);
+      bufferingSpinner.classList.remove('visible');
+      if (errType === mpegts.ErrorTypes.MEDIA_ERROR) {
+        showVideoError('Codec not supported — this channel may broadcast in HEVC/H.265. Try installing "HEVC Video Extensions" from the Microsoft Store, or use Google Chrome.');
+      } else if (errType === mpegts.ErrorTypes.NETWORK_ERROR) {
+        showVideoError('Stream unavailable — check that the receiver is on and reachable.');
+      }
+    });
+  }
+
   // ─── Channel tuning & streaming ───────────────────────────────────────────
-  function tuneChannel(sRef, name, itemEl) {
+  async function tuneChannel(sRef, name, itemEl) {
     // Mark active
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     if (itemEl) itemEl.classList.add('active');
@@ -159,50 +273,18 @@
     videoOverlay.classList.add('hidden');
     bufferingSpinner.classList.add('visible');
 
-    // Destroy previous player instance
-    if (player) {
-      try { player.destroy(); } catch { }
-      player = null;
-    }
-    videoEl.src = '';
-
-    const streamUrl = `${window.location.origin}/stream/${encodeURIComponent(sRef)}`;
-
-    if (mpegts.isSupported()) {
-      player = mpegts.createPlayer({
-        type: 'mpegts',
-        url: streamUrl,
-        isLive: true,
-      }, {
-        enableWorker: true,
-        enableStashBuffer: false,
-        stashInitialSize: 128,
-        lazyLoad: false,
-        liveBufferLatencyChasing: true,
-        liveBufferLatencyMaxLatency: 1.5,
-        liveBufferLatencyMinRemain: 0.15,
-      });
-
-      player.attachMediaElement(videoEl);
-      player.load();
-      player.play().catch(() => {});
-
-      player.on(mpegts.Events.ERROR, (errType, errDetail, errInfo) => {
-        console.error('mpegts error:', errType, errDetail, errInfo);
-        bufferingSpinner.classList.remove('visible');
-        if (errType === mpegts.ErrorTypes.MEDIA_ERROR) {
-          showVideoError('Codec not supported — this channel may broadcast in HEVC/H.265. Try installing "HEVC Video Extensions" from the Microsoft Store, or use Google Chrome.');
-        } else if (errType === mpegts.ErrorTypes.NETWORK_ERROR) {
-          showVideoError('Stream unavailable — check that the receiver is on and reachable.');
-        }
-      });
-    } else {
-      showVideoError('Your browser does not support MSE/MPEG-TS playback. Please use Chrome or Edge.');
-    }
+    await stopCurrentPlayback();
 
     videoEl.onwaiting = () => bufferingSpinner.classList.add('visible');
-    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); }
+    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
     videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
+
+    try {
+      await startHlsPlayback(sRef, () => tryMpegtsPlayback(sRef));
+    } catch (hlsErr) {
+      console.warn('HLS start failed, fallback to mpegts:', hlsErr);
+      tryMpegtsPlayback(sRef);
+    }
 
     // Load EPG for the selected channel
     loadEpgPanel(sRef, name);
@@ -313,6 +395,7 @@
   }
 
   function showVideoError(msg) {
+    stopCurrentPlayback().catch(() => {});
     bufferingSpinner.classList.remove('visible');
     videoOverlay.classList.remove('hidden');
     videoOverlay.querySelector('.overlay-icon').textContent = '⚠';
@@ -324,6 +407,17 @@
     videoOverlay.querySelector('.overlay-icon').textContent = '▶';
     videoOverlay.querySelector('.overlay-text').textContent = 'Select a channel';
   }
+
+  // ─── Cleanup on page close ────────────────────────────────────────────────
+  window.addEventListener('beforeunload', () => {
+    if (hlsSessionId) {
+      const blob = new Blob(
+        [JSON.stringify({ sessionId: hlsSessionId })],
+        { type: 'application/json' }
+      );
+      navigator.sendBeacon('/hls/stop', blob);
+    }
+  });
 
   // ─── Boot ─────────────────────────────────────────────────────────────────
   loadBouquets();
