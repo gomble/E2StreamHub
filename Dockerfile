@@ -19,6 +19,9 @@ RUN wget -q --tries=3 --timeout=30 -O src/public/js/mpegts.js \
 RUN wget -q --tries=3 --timeout=30 -O src/public/js/hls.min.js \
     https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js && \
     echo "hls.min.js downloaded: $(wc -c < src/public/js/hls.min.js) bytes"
+RUN wget -q --tries=3 --timeout=30 -O src/public/js/sortable.min.js \
+    https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js && \
+    echo "sortable.min.js downloaded: $(wc -c < src/public/js/sortable.min.js) bytes"
 
 EXPOSE 3000
 

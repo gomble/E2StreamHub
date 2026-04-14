@@ -249,6 +249,120 @@ app.get('/api/epgevent', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Bouquet Editor ───────────────────────────────────────────────────────────
+
+// Extract file path from bouquet ref:
+// "1:7:1:0:0:0:0:0:0:0:FROM BOUQUET \"userbouquet.xxx.tv\" ORDER BY bouquet"
+function bouquetFilePath(bRef) {
+  const m = String(bRef || '').match(/"([^"]+)"/);
+  return m ? `/etc/enigma2/${m[1]}` : null;
+}
+
+async function enigmaReadFile(filePath) {
+  const config = {
+    params: { file: filePath },
+    timeout: 15000,
+    responseType: 'text',
+    transformResponse: [d => d],
+  };
+  if (enigmaAuth) config.auth = enigmaAuth;
+  const { data } = await axios.get(`${enigmaBase}/api/file`, config);
+  return data;
+}
+
+async function enigmaWriteFile(filePath, content) {
+  const body = new URLSearchParams({ filename: filePath, file: content }).toString();
+  const config = {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 15000,
+  };
+  if (enigmaAuth) config.auth = enigmaAuth;
+  await axios.post(`${enigmaBase}/api/file`, body, config);
+}
+
+function parseBouquetFile(content) {
+  const lines = content.split('\n');
+  let name = '';
+  const items = [];
+  let seq = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (line.startsWith('#NAME ')) {
+      name = line.slice(6).trim();
+      continue;
+    }
+    if (!line.startsWith('#SERVICE ')) continue;
+
+    const sRef = line.slice(9).trim();
+    let description = '';
+    if (i + 1 < lines.length && lines[i + 1].trim().startsWith('#DESCRIPTION ')) {
+      description = lines[i + 1].trim().slice(13).trim();
+      i++;
+    }
+
+    const parts = sRef.split(':');
+    const svcTypePart = (parts[1] || '').toLowerCase();
+    const isMarker = svcTypePart === '832' || parseInt(svcTypePart, 16) === 0x832;
+    const isSubBouquet = sRef.toUpperCase().includes('FROM BOUQUET');
+    const id = `i${++seq}_${Date.now()}`;
+
+    if (isMarker) {
+      items.push({ type: 'marker', sRef, label: description, id });
+    } else if (isSubBouquet) {
+      items.push({ type: 'subbouquet', sRef, label: description, id });
+    } else {
+      items.push({ type: 'service', sRef, name: description, id });
+    }
+  }
+  return { name, items };
+}
+
+function serializeBouquetFile(name, items) {
+  let out = `#NAME ${name}\n`;
+  for (const item of items) {
+    // New markers created in the editor may not have a sRef — generate the standard one
+    const sRef = item.sRef || (item.type === 'marker' ? '1:832:1:0:0:0:0:0:0:0:' : null);
+    if (!sRef) continue; // skip items without a valid sRef
+    out += `#SERVICE ${sRef}\n`;
+    const label = item.type === 'service' ? (item.name || '') : (item.label || '');
+    out += `#DESCRIPTION ${label}\n`;
+  }
+  return out;
+}
+
+app.get('/api/bouquetedit', requireAuth, async (req, res) => {
+  const filePath = bouquetFilePath(req.query.bRef);
+  if (!filePath) return res.status(400).json({ error: 'Invalid bouquet reference' });
+  try {
+    const content = await enigmaReadFile(filePath);
+    const parsed = parseBouquetFile(content);
+    res.json({ ...parsed, filePath });
+  } catch (err) {
+    console.error('bouquetedit read error:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.post('/api/bouquetedit', requireAuth, async (req, res) => {
+  const { filePath, name, items } = req.body;
+  if (!filePath || !name || !Array.isArray(items))
+    return res.status(400).json({ error: 'Missing fields' });
+  if (!filePath.startsWith('/etc/enigma2/'))
+    return res.status(403).json({ error: 'Invalid path' });
+  try {
+    const content = serializeBouquetFile(name, items);
+    await enigmaWriteFile(filePath, content);
+    enigmaGet('/api/reloadservices').catch(() => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('bouquetedit write error:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get('/api/statusinfo', requireAuth, async (req, res) => {
   try {
     const data = await enigmaGet('/api/statusinfo');

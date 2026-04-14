@@ -154,6 +154,8 @@
     btn.addEventListener('click', () => {
       if (btn.dataset.view === 'epg') {
         openEpgOverlay();
+      } else if (btn.dataset.view === 'editor') {
+        if (window._editorOpen) window._editorOpen();
       }
     });
   });
@@ -745,7 +747,7 @@
   // ─── Boot ─────────────────────────────────────────────────────────────────
   loadBouquets();
 
-  // Expose helpers for epg-timeline.js
+  // Expose helpers for epg-timeline.js and bouquet-editor.js
   window._app = {
     apiFetch,
     escHtml,
@@ -755,5 +757,7 @@
     openEventModal,
     tuneChannel,
     bouquetSelect,
+    get allBouquets() { return allBouquets; },
+    channelCache,
   };
 })();

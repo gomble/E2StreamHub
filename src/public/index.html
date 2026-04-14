@@ -17,6 +17,7 @@
   <nav class="topbar-nav">
     <button class="nav-btn active" data-view="player">Player</button>
     <button class="nav-btn" data-view="epg">EPG Guide</button>
+    <button class="nav-btn" data-view="editor">Bouquet Editor</button>
   </nav>
   <div class="topbar-right">
     <span class="status-dot" id="statusDot" title="Receiver Status"></span>
@@ -105,6 +106,66 @@
   </div>
 </div>
 
+<!-- ─── Bouquet Editor Overlay ────────────────────────────────────────────── -->
+<div class="editor-overlay" id="editorOverlay" aria-hidden="true">
+  <div class="editor-panel">
+
+    <div class="editor-header">
+      <div class="editor-header-left">
+        <span class="editor-title">Bouquet Editor</span>
+        <select class="bouquet-select editor-bq-select" id="editorBouquetSelect">
+          <option value="">Select bouquet…</option>
+        </select>
+        <button class="btn-secondary" id="editorLoadBtn">Load</button>
+      </div>
+      <div class="editor-header-right">
+        <span class="editor-status" id="editorStatus"></span>
+        <button class="btn-accent" id="editorSaveBtn" disabled>💾 Save</button>
+        <button class="epg-overlay-close" id="editorCloseBtn" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- Mobile tabs -->
+    <div class="editor-tabs">
+      <button class="editor-tab active" data-tab="edit">✏️ Edit Bouquet</button>
+      <button class="editor-tab" data-tab="search">🔍 Add Channels</button>
+    </div>
+
+    <div class="editor-body">
+
+      <!-- Left: Add channels (source search) -->
+      <div class="editor-left" id="editorLeft">
+        <div class="editor-section-header">
+          <span class="editor-section-label">Add Channels</span>
+          <select class="bouquet-select editor-source-select" id="editorSourceSelect">
+            <option value="">All bouquets…</option>
+          </select>
+        </div>
+        <input class="channel-search editor-search-input" id="editorSearch"
+               type="search" placeholder="Search channels…" autocomplete="off" />
+        <div class="editor-channel-list" id="editorChannelList">
+          <div class="list-placeholder">Select a bouquet above or type to search</div>
+        </div>
+      </div>
+
+      <!-- Right: Bouquet editor -->
+      <div class="editor-right" id="editorRight">
+        <div class="editor-section-header">
+          <input class="editor-name-input" id="editorBouquetName"
+                 placeholder="Bouquet name…" />
+          <button class="btn-secondary" id="editorAddMarkerBtn">+ Marker</button>
+        </div>
+        <div class="editor-sortable" id="editorSortable">
+          <div class="list-placeholder" id="editorEmpty">
+            Load a bouquet to start editing
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- ─── Program Detail Modal ──────────────────────────────────────────────── -->
 <div class="modal-backdrop" id="eventModal" aria-hidden="true">
   <div class="modal-panel" role="dialog">
@@ -126,7 +187,9 @@
 <!-- Scripts -->
 <script src="/js/mpegts.js"></script>
 <script src="/js/hls.min.js"></script>
+<script src="/js/sortable.min.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/epg-timeline.js"></script>
+<script src="/js/bouquet-editor.js"></script>
 </body>
 </html>
