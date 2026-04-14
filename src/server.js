@@ -134,9 +134,8 @@ function touchHlsSession(sessionId) {
 }
 
 function buildSourceUrl(sRef) {
-  if (ENIGMA2_USER) {
-    return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
-  }
+  // Port 8001 is the Enigma2 streaming port — it does not use HTTP auth.
+  // Credentials only apply to the OpenWebif API on ENIGMA2_PORT (usually 80).
   return `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
 }
 
@@ -425,10 +424,8 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   }
 
   // ── Strategy 2: ffmpeg extracts the program from the MPTS on port 8001 ──────
-  let sourceUrl = `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
-  if (ENIGMA2_USER) {
-    sourceUrl = `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
-  }
+  // Port 8001 (streaming) does not use HTTP auth — credentials not needed.
+  const sourceUrl = `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
 
   console.log(`ffmpeg fallback: ${sourceUrl}  program=${programNum}`);
 
@@ -608,33 +605,67 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
     'pipe:1',
   );
 
-  const ff = spawn('ffmpeg', ffArgs);
-  // Register BEFORE resolving so the next concurrent request sees this process
-  // and can kill it if needed.
-  activeFmp4Streams.set(sRef, ff);
-  resolveMySettle(); // Unblock the next request in the chain
+  // Retry loop: if the receiver is still closing the previous connection it
+  // returns a tiny body immediately (exit 251 / "Stream ends prematurely").
+  // Retry up to 4 times with increasing delays before giving up.
+  let clientGone = false;
+  req.on('close', () => { clientGone = true; });
 
-  ff.stdout.pipe(res);
+  let settleResolved = false;
+  const MAX_RETRIES = 4;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    if (clientGone || res.writableEnded) {
+      if (!settleResolved) { settleResolved = true; resolveMySettle(); }
+      break;
+    }
 
-  ff.stderr.on('data', d => {
-    const msg = d.toString().trim();
-    if (msg) console.error(`ffmpeg(fmp4): ${msg}`);
-  });
-  ff.on('error', err => {
-    console.error('ffmpeg(fmp4) spawn error:', err.message);
+    if (attempt > 0) {
+      const delay = attempt * 800; // 800, 1600, 2400, 3200 ms
+      console.log(`fMP4 retry ${attempt}/${MAX_RETRIES} for ${sRef} after ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
+      if (clientGone || res.writableEnded) break;
+    }
+
+    const ff = spawn('ffmpeg', ffArgs);
+    activeFmp4Streams.set(sRef, ff);
+    if (!settleResolved) { settleResolved = true; resolveMySettle(); } // Unblock next queued request
+
+    ff.stdout.pipe(res, { end: false });
+
+    let stderrBuf = '';
+    ff.stderr.on('data', d => {
+      const msg = d.toString().trim();
+      if (msg) { stderrBuf += msg + '\n'; console.error(`ffmpeg(fmp4): ${msg}`); }
+    });
+
+    const exitCode = await new Promise(resolve => {
+      ff.on('error', err => {
+        console.error('ffmpeg(fmp4) spawn error:', err.message);
+        resolve(-1);
+      });
+      ff.on('close', resolve);
+      req.once('close', () => ff.kill('SIGTERM'));
+    });
+
     activeFmp4Streams.delete(sRef);
-    if (!res.headersSent) res.status(502).json({ error: 'Stream processing failed' });
-    else if (!res.writableEnded) res.end();
-  });
-  ff.on('close', (code) => {
-    if (code && code !== 255) console.log(`ffmpeg(fmp4) exited: ${code}`);
-    activeFmp4Streams.delete(sRef);
-    if (!res.writableEnded) res.end();
-  });
-  req.on('close', () => {
-    activeFmp4Streams.delete(sRef);
-    ff.kill('SIGTERM');
-  });
+
+    // Exit 255 = SIGTERM (normal stop by client or channel switch) → don't retry
+    if (exitCode === 255 || clientGone || res.writableEnded) break;
+
+    // Exit 251 = ffmpeg I/O error (receiver not ready) → retry
+    if (exitCode === 251) continue;
+
+    // Any other non-zero exit after producing data → done
+    if (exitCode && exitCode !== 0) {
+      console.log(`ffmpeg(fmp4) exited: ${exitCode}`);
+      break;
+    }
+
+    // Clean exit (0) or data flowed normally → done
+    break;
+  }
+
+  if (!res.writableEnded) res.end();
 });
 
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
