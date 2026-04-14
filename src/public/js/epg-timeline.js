@@ -115,6 +115,9 @@
       slotTime = new Date(slotTime.getTime() + 30 * 60000);
     }
 
+    // Map index → evt object so click handler can access the full event data
+    const evtMap = [];
+
     // Assemble HTML
     let html = '';
 
@@ -162,12 +165,14 @@
           style="left:${leftPx}px;width:${widthPx}px"
           data-sref="${escAttr(ch.sRef)}"
           data-name="${escAttr(ch.name)}"
+          data-evtidx="${evtMap.length}"
           title="${escAttr(window._app.decodeHtml(evt.title || ''))} (${fmtTime(startDate)}–${fmtTime(endDate)})">`;
         html += `<div class="epg-program-title">${window._app.escHtml(window._app.decodeHtml(evt.title || '–'))}</div>`;
         if (widthPx > 80) {
           html += `<div class="epg-program-time">${fmtTime(startDate)}–${fmtTime(endDate)}</div>`;
         }
         html += `</div>`;
+        evtMap.push(evt);
       });
 
       html += `</div></div>`;  // .epg-programs-track + .epg-channel-row
@@ -177,6 +182,11 @@
 
     epgGuide.innerHTML = html;
 
+    // Attach evt objects to program divs so the click handler can open the modal
+    epgGuide.querySelectorAll('.epg-program[data-evtidx]').forEach(el => {
+      el._evt = evtMap[parseInt(el.dataset.evtidx, 10)];
+    });
+
     // ─── Event delegation ───────────────────────────────────────────────
     epgGuide.addEventListener('click', onGuideClick, { once: true });
 
@@ -184,28 +194,39 @@
     scrollToNow(viewStartTs, viewEndTs, nowTs, totalMin);
   }
 
-  function onGuideClick(e) {
-    const target = e.target.closest('[data-sref]');
-    if (!target) {
-      epgGuide.addEventListener('click', onGuideClick, { once: true });
-      return;
-    }
-    const sRef = target.dataset.sref;
-    const name = target.dataset.name;
-    if (!sRef) {
-      epgGuide.addEventListener('click', onGuideClick, { once: true });
-      return;
-    }
-
-    // Switch to player view and tune
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelector('[data-view="player"]').classList.add('active');
-    document.getElementById('viewPlayer').classList.add('active');
-
-    // Find channel item in sidebar and select it
+  function tuneFromOverlay(sRef, name) {
+    // Close EPG overlay and switch to player
+    document.getElementById('epgOverlay').classList.remove('open');
+    document.getElementById('epgOverlay').setAttribute('aria-hidden', 'true');
     const sideItem = [...document.querySelectorAll('.channel-item')].find(el => el.dataset.sref === sRef) || null;
     window._app.tuneChannel(sRef, name, sideItem);
+  }
+
+  function onGuideClick(e) {
+    // Always re-attach (we use { once: true } to avoid duplicate fires on re-render)
+    const reattach = () => epgGuide.addEventListener('click', onGuideClick, { once: true });
+
+    const program = e.target.closest('.epg-program');
+    const label   = e.target.closest('.epg-channel-label');
+
+    if (program) {
+      // Show detail modal for this program block
+      const sRef = program.dataset.sref;
+      const name = program.dataset.name;
+      const evt  = program._evt;
+      if (evt) window._app.openEventModal(evt, name, sRef);
+      reattach();
+      return;
+    }
+
+    if (label) {
+      // Channel label click → tune immediately
+      tuneFromOverlay(label.dataset.sref, label.dataset.name);
+      reattach();
+      return;
+    }
+
+    reattach();
   }
 
   function scrollToNow(viewStartTs, viewEndTs, nowTs, totalMin) {

@@ -463,6 +463,105 @@ input { font-family: inherit; }
   margin-top: 4px;
 }
 
+.epg-event { cursor: pointer; }
+.epg-event:hover .epg-event-title { color: #fff; }
+
+/* ─── Program Detail Modal ─────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.65);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-panel {
+  position: relative;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 28px 28px 24px;
+  transform: translateY(20px);
+  transition: transform .2s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-backdrop.open .modal-panel { transform: translateY(0); }
+
+.modal-close {
+  position: absolute;
+  top: 14px; right: 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 4px 9px;
+  transition: border-color .2s, color .2s;
+}
+.modal-close:hover { border-color: var(--accent); color: var(--accent); }
+
+.modal-channel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--accent);
+}
+.modal-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+  padding-right: 32px;
+}
+.modal-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.modal-progress-wrap {
+  height: 3px;
+  background: var(--bg4);
+  border-radius: 2px;
+  overflow: hidden;
+  display: none;
+}
+.modal-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.modal-desc {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.modal-longdesc {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.modal-desc:empty, .modal-longdesc:empty { display: none; }
+.modal-actions { padding-top: 6px; }
+.modal-actions .btn-secondary { font-size: 13px; }
+
 /* ─── EPG Guide Overlay ────────────────────────────────────────────────────── */
 .epg-overlay {
   position: fixed;

@@ -55,6 +55,87 @@
   checkStatus();
   setInterval(checkStatus, 30000);
 
+  // ─── Program Detail Modal ─────────────────────────────────────────────────
+  const eventModal    = document.getElementById('eventModal');
+  const evtModalClose = document.getElementById('eventModalClose');
+
+  function openEventModal(evt, channelName, sRef) {
+    _evtModalSRef = sRef || null;
+    _evtModalName = channelName || null;
+    const now = Date.now() / 1000;
+    const start = evt.begin_timestamp;
+    const end   = start + evt.duration_sec;
+    const startDate = new Date(start * 1000);
+    const endDate   = new Date(end   * 1000);
+    const durMin = Math.round(evt.duration_sec / 60);
+    const isCurrent = start <= now && end > now;
+
+    document.getElementById('evtModalChannel').textContent = channelName || '';
+    document.getElementById('evtModalTitle').textContent = decodeHtml(evt.title || '');
+    document.getElementById('evtModalMeta').textContent =
+      `${fmtDateTime(startDate)} – ${fmtTime(endDate)}  ·  ${durMin} min`;
+
+    const progressWrap = document.getElementById('evtModalProgressWrap');
+    if (isCurrent) {
+      const pct = ((now - start) / evt.duration_sec) * 100;
+      document.getElementById('evtModalProgress').style.width = `${Math.min(100, pct)}%`;
+      progressWrap.style.display = 'block';
+    } else {
+      progressWrap.style.display = 'none';
+    }
+
+    document.getElementById('evtModalShort').textContent = decodeHtml(evt.shortdesc || '');
+    document.getElementById('evtModalLong').textContent = decodeHtml(evt.longdesc || '');
+
+    eventModal.classList.add('open');
+    eventModal.setAttribute('aria-hidden', 'false');
+
+    // Fetch longdesc if we have an event id and it's not already loaded
+    const eventid = evt.id || evt.eventid;
+    if (sRef && eventid && !evt.longdesc) {
+      apiFetch(`/api/epgevent?eventid=${encodeURIComponent(eventid)}&sRef=${encodeURIComponent(sRef)}`)
+        .then(data => {
+          const ev = (data.events || [])[0];
+          if (ev && ev.longdesc) {
+            document.getElementById('evtModalLong').textContent = decodeHtml(ev.longdesc);
+          }
+          if (ev && ev.shortdesc && !evt.shortdesc) {
+            document.getElementById('evtModalShort').textContent = decodeHtml(ev.shortdesc);
+          }
+        }).catch(() => {});
+    }
+  }
+
+  function closeEventModal() {
+    eventModal.classList.remove('open');
+    eventModal.setAttribute('aria-hidden', 'true');
+  }
+
+  let _evtModalSRef = null;
+  let _evtModalName = null;
+
+  document.getElementById('evtModalTuneBtn').addEventListener('click', () => {
+    if (!_evtModalSRef) return;
+    closeEventModal();
+    // Close EPG overlay if open
+    if (epgOverlay && epgOverlay.classList.contains('open')) {
+      epgOverlay.classList.remove('open');
+      epgOverlay.setAttribute('aria-hidden', 'true');
+    }
+    const sideItem = [...document.querySelectorAll('.channel-item')].find(el => el.dataset.sref === _evtModalSRef) || null;
+    tuneChannel(_evtModalSRef, _evtModalName, sideItem);
+  });
+
+  evtModalClose.addEventListener('click', closeEventModal);
+  eventModal.addEventListener('click', e => { if (e.target === eventModal) closeEventModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && eventModal.classList.contains('open')) closeEventModal();
+  });
+
+  function fmtDateTime(date) {
+    return date.toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
   // ─── Navigation ───────────────────────────────────────────────────────────
   const epgOverlay = document.getElementById('epgOverlay');
 
@@ -527,7 +608,7 @@
 
     try {
       const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(sRef)}`);
-      const events = (data.events || []).slice(0, 20);
+      const events = data.events || [];
 
       if (events.length === 0) {
         epgContent.innerHTML = '<div class="epg-empty">No EPG data available</div>';
@@ -554,11 +635,11 @@
           ${evt.shortdesc ? `<div class="epg-event-desc">${escHtml(decodeHtml(evt.shortdesc))}</div>` : ''}
           <div class="epg-event-duration">${durMin} min</div>
         `;
+        div.addEventListener('click', () => openEventModal(evt, channelName, sRef));
         epgContent.appendChild(div);
 
         if (isCurrent) {
           updateNowPlayingBar(channelName, evt, now);
-          // Scroll current event into view
           setTimeout(() => div.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 100);
         }
       });
@@ -670,6 +751,8 @@
     escHtml,
     decodeHtml,
     fmtTime,
+    fmtDateTime,
+    openEventModal,
     tuneChannel,
     bouquetSelect,
   };

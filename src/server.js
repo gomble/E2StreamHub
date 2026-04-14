@@ -237,6 +237,18 @@ app.get('/api/epgbouquet', requireAuth, async (req, res) => {
   }
 });
 
+// Full event details including longdesc — used by the program info modal
+app.get('/api/epgevent', requireAuth, async (req, res) => {
+  try {
+    const { eventid, sRef } = req.query;
+    const data = await enigmaGet('/api/epgevent', { eventid, sRef });
+    res.json(data);
+  } catch (err) {
+    console.error('epgevent error:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get('/api/statusinfo', requireAuth, async (req, res) => {
   try {
     const data = await enigmaGet('/api/statusinfo');

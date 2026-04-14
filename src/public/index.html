@@ -98,6 +98,24 @@
   </div>
 </div>
 
+<!-- ─── Program Detail Modal ──────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="eventModal" aria-hidden="true">
+  <div class="modal-panel" role="dialog">
+    <button class="modal-close" id="eventModalClose" title="Close">✕</button>
+    <div class="modal-channel" id="evtModalChannel"></div>
+    <div class="modal-title" id="evtModalTitle"></div>
+    <div class="modal-meta" id="evtModalMeta"></div>
+    <div class="modal-progress-wrap" id="evtModalProgressWrap">
+      <div class="modal-progress-bar" id="evtModalProgress"></div>
+    </div>
+    <div class="modal-desc" id="evtModalShort"></div>
+    <div class="modal-longdesc" id="evtModalLong"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="evtModalTuneBtn">▶ Kanal einschalten</button>
+    </div>
+  </div>
+</div>
+
 <!-- Scripts -->
 <script src="/js/mpegts.js"></script>
 <script src="/js/hls.min.js"></script>
