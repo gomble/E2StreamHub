@@ -521,10 +521,15 @@
   }
 
   // Decode HTML entities returned by the OpenWebif API (e.g. &#x27; → ')
-  const _decodeEl = document.createElement('textarea');
   function decodeHtml(str) {
-    _decodeEl.innerHTML = String(str || '');
-    return _decodeEl.value;
+    return String(str || '')
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+      .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'");
   }
 
   function fmtTime(date) {
