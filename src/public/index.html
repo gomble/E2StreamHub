@@ -80,12 +80,19 @@
           <option value="">Select bouquet…</option>
         </select>
         <button class="btn-secondary" id="epgLoadBtn">Load EPG</button>
+        <select class="epg-zoom-select" id="epgZoomSelect" title="Sichtbarer Zeitbereich">
+          <option value="2">2 Std.</option>
+          <option value="3" selected>3 Std.</option>
+          <option value="6">6 Std.</option>
+          <option value="12">12 Std.</option>
+          <option value="24">24 Std.</option>
+        </select>
       </div>
       <div class="epg-time-nav">
         <button class="btn-icon" id="epgPrevBtn">◀</button>
         <span class="epg-time-range" id="epgTimeRange"></span>
         <button class="btn-icon" id="epgNextBtn">▶</button>
-        <button class="btn-secondary" id="epgNowBtn">Now</button>
+        <button class="btn-secondary" id="epgNowBtn">Jetzt</button>
       </div>
       <button class="epg-overlay-close" id="epgCloseBtn" title="Close">✕</button>
     </div>

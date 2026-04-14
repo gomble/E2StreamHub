@@ -632,6 +632,19 @@ input { font-family: inherit; }
   gap: 8px;
 }
 
+.epg-zoom-select {
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.epg-zoom-select:focus { border-color: var(--accent); }
+
 .epg-time-nav {
   display: flex;
   align-items: center;
@@ -704,6 +717,8 @@ input { font-family: inherit; }
   z-index: 10;
   background: var(--bg3);
   border-bottom: 1px solid var(--border);
+  height: 34px;
+  flex-shrink: 0;
 }
 
 .epg-time-header-spacer {
@@ -711,17 +726,32 @@ input { font-family: inherit; }
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   background: var(--bg2);
+  position: sticky;
+  left: 0;
+  z-index: 11;
 }
 
-.epg-time-slot {
-  width: var(--epg-hour-w);
+/* Track that holds slots — must match the program track width */
+.epg-time-header-track {
+  position: relative;
   flex-shrink: 0;
-  padding: 8px 12px;
-  font-size: 12px;
+  overflow: visible;
+}
+
+/* Slots are absolutely positioned inside the track */
+.epg-time-slot {
+  position: absolute;
+  top: 0;
+  height: 34px;
+  padding: 8px 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-dim);
   border-right: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Channel rows */
@@ -742,6 +772,8 @@ input { font-family: inherit; }
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
+  position: sticky;
+  left: 0;
   display: flex;
   align-items: center;
   position: sticky;
@@ -758,9 +790,8 @@ input { font-family: inherit; }
 
 .epg-programs-track {
   position: relative;
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .epg-program {
