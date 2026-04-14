@@ -96,12 +96,16 @@
   });
 
   // ─── Bouquets ─────────────────────────────────────────────────────────────
+  let allBouquets = [];            // [{ ref, name }]
+  const channelCache = new Map();  // bouquetRef → services[]
+
   async function loadBouquets() {
     try {
       const data = await apiFetch('/api/bouquets');
       const bouquets = data.bouquets || [];
+      allBouquets = bouquets.map(([ref, name]) => ({ ref, name }));
       bouquetSelect.innerHTML = '<option value="">Select bouquet…</option>';
-      bouquets.forEach(([ref, name]) => {
+      allBouquets.forEach(({ ref, name }) => {
         const opt = document.createElement('option');
         opt.value = ref;
         opt.textContent = name;
@@ -119,72 +123,159 @@
   });
 
   // ─── Channels ─────────────────────────────────────────────────────────────
-  async function loadChannels(bouquetRef) {
-    channelList.innerHTML = '<div class="list-placeholder">Loading channels…</div>';
-    try {
-      const data = await apiFetch(`/api/services?sRef=${encodeURIComponent(bouquetRef)}`);
-      const services = data.services || [];
+  function renderChannelList(services, bouquetRef) {
+    channelList.innerHTML = '';
+    services.forEach((svc, idx) => {
+      const item = document.createElement('div');
+      item.className = 'channel-item';
+      item.dataset.sref = svc.servicereference;
+      item.dataset.name = svc.servicename;
+      item.dataset.bouquet = bouquetRef;
+      item.innerHTML = `
+        <span class="channel-num">${idx + 1}</span>
+        <span class="channel-name">${escHtml(svc.servicename)}</span>
+        <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
+      `;
+      item.addEventListener('click', () => {
+        clearTimeout(item._tuneTimer);
+        item._tuneTimer = setTimeout(() => tuneChannel(svc.servicereference, svc.servicename, item), 250);
+      });
+      channelList.appendChild(item);
+    });
+  }
 
+  async function loadChannels(bouquetRef) {
+    channelList.innerHTML = '<div class="list-placeholder">Loading…</div>';
+    try {
+      let services = channelCache.get(bouquetRef);
+      if (!services) {
+        const data = await apiFetch(`/api/services?sRef=${encodeURIComponent(bouquetRef)}`);
+        services = data.services || [];
+        channelCache.set(bouquetRef, services);
+      }
       if (services.length === 0) {
         channelList.innerHTML = '<div class="list-placeholder">No channels found</div>';
         return;
       }
-
-      channelList.innerHTML = '';
-      services.forEach((svc, idx) => {
-        const item = document.createElement('div');
-        item.className = 'channel-item';
-        item.dataset.sref = svc.servicereference;
-        item.dataset.name = svc.servicename;
-        item.innerHTML = `
-          <span class="channel-num">${idx + 1}</span>
-          <span class="channel-name">${escHtml(svc.servicename)}</span>
-          <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
-        `;
-        item.addEventListener('click', () => {
-          clearTimeout(item._tuneTimer);
-          item._tuneTimer = setTimeout(() => tuneChannel(svc.servicereference, svc.servicename, item), 250);
-        });
-        channelList.appendChild(item);
-      });
-
-      // Load short EPG for channel list (debounced / lightweight)
+      renderChannelList(services, bouquetRef);
       loadChannelListEpg(services.slice(0, 40));
-
-      // Apply any pending search term
-      applyChannelSearch(document.getElementById('channelSearch').value);
     } catch (e) {
       channelList.innerHTML = `<div class="list-placeholder">Error: ${escHtml(e.message)}</div>`;
     }
   }
 
-  // ─── Channel search ────────────────────────────────────────────────────────
-  function applyChannelSearch(term) {
+  // ─── Cross-bouquet search ──────────────────────────────────────────────────
+  let searchDebounce = null;
+  let searchAbort = null;
+
+  document.getElementById('channelSearch').addEventListener('input', e => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => runSearch(e.target.value), 250);
+  });
+
+  async function runSearch(term) {
     const q = term.trim().toLowerCase();
-    let visibleCount = 0;
-    channelList.querySelectorAll('.channel-item').forEach(item => {
-      const name = (item.dataset.name || '').toLowerCase();
-      const matches = !q || name.includes(q);
-      item.style.display = matches ? '' : 'none';
-      if (matches) visibleCount++;
-    });
-    // Show/hide a no-results placeholder
-    let noRes = channelList.querySelector('.search-no-results');
-    if (q && visibleCount === 0) {
-      if (!noRes) {
-        noRes = document.createElement('div');
-        noRes.className = 'list-placeholder search-no-results';
-        channelList.appendChild(noRes);
+
+    // Empty search → restore current bouquet view
+    if (!q) {
+      const ref = bouquetSelect.value;
+      if (ref) {
+        loadChannels(ref);
+      } else {
+        channelList.innerHTML = '<div class="list-placeholder">Please select a bouquet</div>';
       }
-      noRes.textContent = `No results for "${term}"`;
-    } else if (noRes) {
-      noRes.remove();
+      return;
+    }
+
+    // Abort any previous in-flight search
+    if (searchAbort) { searchAbort.aborted = true; }
+    const abort = { aborted: false };
+    searchAbort = abort;
+
+    channelList.innerHTML = '<div class="list-placeholder">Searching…</div>';
+
+    // Collect results: first search already-cached bouquets instantly,
+    // then fetch the rest in background and append as they arrive.
+    const results = []; // { svc, bouquetRef, bouquetName }
+
+    for (const { ref, name: bouquetName } of allBouquets) {
+      if (abort.aborted) return;
+
+      let services = channelCache.get(ref);
+      if (!services) {
+        try {
+          const data = await apiFetch(`/api/services?sRef=${encodeURIComponent(ref)}`);
+          services = data.services || [];
+          channelCache.set(ref, services);
+        } catch { continue; }
+      }
+      if (abort.aborted) return;
+
+      const matches = services.filter(s => s.servicename.toLowerCase().includes(q));
+      matches.forEach(svc => results.push({ svc, bouquetRef: ref, bouquetName }));
+
+      // Re-render after each bouquet so results appear progressively
+      renderSearchResults(results, q, term);
     }
   }
 
-  document.getElementById('channelSearch').addEventListener('input', e => {
-    applyChannelSearch(e.target.value);
-  });
+  function renderSearchResults(results, q, term) {
+    channelList.innerHTML = '';
+
+    if (results.length === 0) {
+      channelList.innerHTML = `<div class="list-placeholder">No results for "${escHtml(term)}"</div>`;
+      return;
+    }
+
+    // Group by bouquet for rendering, but keep match order flat
+    let lastBouquet = null;
+    results.forEach(({ svc, bouquetRef, bouquetName }) => {
+      if (bouquetName !== lastBouquet) {
+        lastBouquet = bouquetName;
+        const sep = document.createElement('div');
+        sep.className = 'search-bouquet-label';
+        sep.textContent = bouquetName;
+        channelList.appendChild(sep);
+      }
+
+      const item = document.createElement('div');
+      item.className = 'channel-item';
+      item.dataset.sref = svc.servicereference;
+      item.dataset.name = svc.servicename;
+
+      // Highlight matching part of name
+      const nameLower = svc.servicename.toLowerCase();
+      const idx = nameLower.indexOf(q);
+      let highlighted;
+      if (idx >= 0) {
+        highlighted = escHtml(svc.servicename.slice(0, idx))
+          + `<mark>${escHtml(svc.servicename.slice(idx, idx + q.length))}</mark>`
+          + escHtml(svc.servicename.slice(idx + q.length));
+      } else {
+        highlighted = escHtml(svc.servicename);
+      }
+
+      item.innerHTML = `
+        <span class="channel-name" style="padding-left:0">${highlighted}</span>
+        <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
+      `;
+
+      item.addEventListener('click', () => {
+        clearTimeout(item._tuneTimer);
+        item._tuneTimer = setTimeout(async () => {
+          // Switch bouquet in the select + cache, then tune
+          bouquetSelect.value = bouquetRef;
+          document.getElementById('channelSearch').value = '';
+          await loadChannels(bouquetRef);
+          // Find the rendered item for this sRef and mark active
+          const rendered = channelList.querySelector(`[data-sref="${CSS.escape(svc.servicereference)}"]`);
+          tuneChannel(svc.servicereference, svc.servicename, rendered);
+        }, 250);
+      });
+
+      channelList.appendChild(item);
+    });
+  }
 
   async function loadChannelListEpg(services) {
     // Load EPG for visible channels in background to show "now playing" in list

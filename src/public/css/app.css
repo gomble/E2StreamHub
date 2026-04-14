@@ -232,6 +232,23 @@ input { font-family: inherit; }
   flex: 1;
 }
 
+.search-bouquet-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text-muted);
+  padding: 8px 14px 4px;
+  border-top: 1px solid var(--border);
+}
+.search-bouquet-label:first-child { border-top: none; }
+
+.channel-item mark {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .channel-now {
   font-size: 11px;
   color: var(--text-dim);
