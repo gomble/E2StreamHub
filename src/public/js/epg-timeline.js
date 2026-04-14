@@ -47,45 +47,48 @@
   }
 
   // ─── Load EPG ─────────────────────────────────────────────────────────────
+  // /api/epgbouquet only returns the CURRENT event per channel — useless for
+  // a timeline. Load full schedules via /api/epg (/api/epgservice) per channel
+  // in parallel batches so we get past + current + future events.
   async function loadAndRender(bRef) {
-    epgGuide.innerHTML = '<div class="epg-guide-loading">Loading EPG…</div>';
+    epgGuide.innerHTML = '<div class="epg-guide-loading">Loading channels…</div>';
 
     try {
-      // Step 1: Get services for the bouquet
       const svcData = await window._app.apiFetch(`/api/services?sRef=${encodeURIComponent(bRef)}`);
-      const services = (svcData.services || []).slice(0, 50); // limit to 50 channels
+      const services = (svcData.services || []).slice(0, 50);
 
       if (services.length === 0) {
         epgGuide.innerHTML = '<div class="epg-guide-placeholder">No channels in bouquet</div>';
         return;
       }
 
-      // Step 2: Try bulk EPG endpoint first, fall back to per-channel
-      let eventsByRef = {};
-      try {
-        const bulkData = await window._app.apiFetch(`/api/epgbouquet?bRef=${encodeURIComponent(bRef)}`);
-        const bulkEvents = bulkData.events || [];
-        bulkEvents.forEach(evt => {
-          const ref = evt.sref || evt.servicereference;
-          if (!ref) return;
-          if (!eventsByRef[ref]) eventsByRef[ref] = [];
-          eventsByRef[ref].push(evt);
-        });
-      } catch {
-        // Fallback: load EPG per channel (slower)
-        for (const svc of services) {
+      epgGuide.innerHTML = `<div class="epg-guide-loading">Loading EPG (0 / ${services.length})…</div>`;
+
+      // Fetch full EPG for all channels in parallel batches of 6
+      const BATCH = 6;
+      const eventsByRef = {};
+      let done = 0;
+
+      for (let i = 0; i < services.length; i += BATCH) {
+        const batch = services.slice(i, i + BATCH);
+        await Promise.all(batch.map(async svc => {
           try {
-            const epgData = await window._app.apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
-            eventsByRef[svc.servicereference] = epgData.events || [];
-          } catch { eventsByRef[svc.servicereference] = []; }
-        }
+            const data = await window._app.apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
+            eventsByRef[svc.servicereference] = data.events || [];
+          } catch {
+            eventsByRef[svc.servicereference] = [];
+          }
+          done++;
+          const loading = epgGuide.querySelector('.epg-guide-loading');
+          if (loading) loading.textContent = `Loading EPG (${done} / ${services.length})…`;
+        }));
       }
 
-      // Step 3: Build guide data
       guideData = services.map(svc => ({
         name: svc.servicename,
         sRef: svc.servicereference,
-        events: (eventsByRef[svc.servicereference] || []).sort((a, b) => a.begin_timestamp - b.begin_timestamp),
+        events: (eventsByRef[svc.servicereference] || [])
+          .sort((a, b) => a.begin_timestamp - b.begin_timestamp),
       }));
 
       renderGuide();
