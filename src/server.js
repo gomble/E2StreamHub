@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
+const { Client: SshClient } = require('ssh2');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,7 @@ const ENIGMA2_PORT = parseInt(process.env.ENIGMA2_PORT || '80', 10);
 const ENIGMA2_STREAM_PORT = parseInt(process.env.ENIGMA2_STREAM_PORT || '8001', 10);
 const ENIGMA2_USER = process.env.ENIGMA2_USER || '';
 const ENIGMA2_PASSWORD = process.env.ENIGMA2_PASSWORD || '';
+const ENIGMA2_SSH_PORT = parseInt(process.env.ENIGMA2_SSH_PORT || '22', 10);
 const APP_USERNAME = process.env.APP_USERNAME || 'admin';
 const APP_PASSWORD = process.env.APP_PASSWORD || 'admin';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'e2streamhub-change-this-secret';
@@ -271,13 +273,57 @@ async function enigmaReadFile(filePath) {
 }
 
 async function enigmaWriteFile(filePath, content) {
-  const body = new URLSearchParams({ filename: filePath, file: content }).toString();
-  const config = {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    timeout: 15000,
-  };
-  if (enigmaAuth) config.auth = enigmaAuth;
-  await axios.post(`${enigmaBase}/api/file`, body, config);
+  // Try OpenWebif HTTP file API first
+  try {
+    const body = new URLSearchParams({ filename: filePath, file: content }).toString();
+    const config = {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 15000,
+    };
+    if (enigmaAuth) config.auth = enigmaAuth;
+    await axios.post(`${enigmaBase}/api/file`, body, config);
+    return; // success
+  } catch (err) {
+    if (err.response?.status !== 404 && err.response?.status !== 405) throw err;
+    // HTTP file API not available — fall through to SSH
+    console.warn('[enigmaWriteFile] HTTP file API unavailable, trying SSH');
+  }
+
+  // SSH fallback: write file directly via SFTP
+  if (!ENIGMA2_USER || !ENIGMA2_PASSWORD) {
+    throw new Error('SSH-Schreiben fehlgeschlagen: ENIGMA2_USER / ENIGMA2_PASSWORD nicht konfiguriert');
+  }
+  await sshWriteFile(ENIGMA2_HOST, ENIGMA2_SSH_PORT, ENIGMA2_USER, ENIGMA2_PASSWORD, filePath, content);
+}
+
+function sshWriteFile(host, port, user, password, remotePath, content) {
+  return new Promise((resolve, reject) => {
+    const conn = new SshClient();
+    const buf = Buffer.from(content, 'utf8');
+
+    conn.on('ready', () => {
+      conn.sftp((err, sftp) => {
+        if (err) { conn.end(); return reject(err); }
+
+        const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
+        stream.on('error', e => { conn.end(); reject(e); });
+        stream.on('close', () => { conn.end(); resolve(); });
+        stream.end(buf);
+      });
+    });
+
+    conn.on('error', reject);
+
+    conn.connect({
+      host,
+      port,
+      username: user,
+      password,
+      readyTimeout: 10000,
+      // Accept any host key (receiver is on local network, no CA)
+      hostVerifier: () => true,
+    });
+  });
 }
 
 function parseBouquetFile(content) {
