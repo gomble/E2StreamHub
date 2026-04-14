@@ -334,14 +334,19 @@ function serializeBouquetFile(name, items) {
 }
 
 app.get('/api/bouquetedit', requireAuth, async (req, res) => {
-  const filePath = bouquetFilePath(req.query.bRef);
+  const bRef = req.query.bRef || '';
+  const filePath = bouquetFilePath(bRef);
+  console.log('[bouquetedit] bRef:', bRef);
+  console.log('[bouquetedit] filePath:', filePath);
   if (!filePath) return res.status(400).json({ error: 'Invalid bouquet reference' });
   try {
     const content = await enigmaReadFile(filePath);
     const parsed = parseBouquetFile(content);
     res.json({ ...parsed, filePath });
   } catch (err) {
-    console.error('bouquetedit read error:', err.message);
+    console.error('[bouquetedit] read error:', err.message);
+    console.error('[bouquetedit] response status:', err.response?.status);
+    console.error('[bouquetedit] response data:', JSON.stringify(err.response?.data)?.slice(0, 300));
     res.status(502).json({ error: err.message });
   }
 });
