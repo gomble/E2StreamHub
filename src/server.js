@@ -336,18 +336,43 @@ function serializeBouquetFile(name, items) {
 app.get('/api/bouquetedit', requireAuth, async (req, res) => {
   const bRef = req.query.bRef || '';
   const filePath = bouquetFilePath(bRef);
-  console.log('[bouquetedit] bRef:', bRef);
-  console.log('[bouquetedit] filePath:', filePath);
   if (!filePath) return res.status(400).json({ error: 'Invalid bouquet reference' });
+
+  // Try to read the actual bouquet file (preserves markers / order)
   try {
     const content = await enigmaReadFile(filePath);
     const parsed = parseBouquetFile(content);
-    res.json({ ...parsed, filePath });
+    return res.json({ ...parsed, filePath });
   } catch (err) {
-    console.error('[bouquetedit] read error:', err.message);
-    console.error('[bouquetedit] response status:', err.response?.status);
-    console.error('[bouquetedit] response data:', JSON.stringify(err.response?.data)?.slice(0, 300));
-    res.status(502).json({ error: err.message });
+    const status = err.response?.status;
+    if (status !== 404 && status !== 405) {
+      // Unexpected error — report it
+      console.error('[bouquetedit] read error:', err.message);
+      return res.status(502).json({ error: err.message });
+    }
+    // File API not available on this OpenWebif version — fall back to services list
+    console.warn('[bouquetedit] /api/file not available (HTTP %d), falling back to getservices', status);
+  }
+
+  // Fallback: reconstruct bouquet from the working /api/getservices endpoint.
+  // Markers are not preserved in this path, but channel list and order are.
+  try {
+    const svcData = await enigmaGet('/api/getservices', { sRef: bRef });
+    const services = svcData.services || [];
+    // Derive a display name from the file path (e.g. "userbouquet.ciefpskyde.tv" → "ciefpskyde")
+    const name = filePath.split('/').pop()
+      .replace(/^userbouquet\./, '')
+      .replace(/\.[^.]+$/, '');
+    const items = services.map((svc, i) => ({
+      type: 'service',
+      sRef: svc.servicereference,
+      name: svc.servicename,
+      id: `i${i + 1}`,
+    }));
+    return res.json({ name, items, filePath });
+  } catch (err2) {
+    console.error('[bouquetedit] fallback getservices error:', err2.message);
+    return res.status(502).json({ error: err2.message });
   }
 });
 
@@ -363,7 +388,12 @@ app.post('/api/bouquetedit', requireAuth, async (req, res) => {
     enigmaGet('/api/reloadservices').catch(() => {});
     res.json({ ok: true });
   } catch (err) {
-    console.error('bouquetedit write error:', err.message);
+    console.error('[bouquetedit] write error:', err.message, 'status:', err.response?.status);
+    if (err.response?.status === 404 || err.response?.status === 405) {
+      return res.status(502).json({
+        error: 'Speichern nicht möglich: Diese OpenWebif-Version unterstützt keine Datei-API. Bitte OpenWebif aktualisieren.',
+      });
+    }
     res.status(502).json({ error: err.message });
   }
 });
