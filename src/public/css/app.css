@@ -145,7 +145,25 @@ input { font-family: inherit; }
   padding: 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
+
+.channel-search {
+  width: 100%;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .2s;
+}
+.channel-search::placeholder { color: var(--text-muted); }
+.channel-search:focus { border-color: var(--accent); }
+.channel-search::-webkit-search-cancel-button { cursor: pointer; }
 
 .bouquet-select {
   width: 100%;
@@ -428,10 +446,58 @@ input { font-family: inherit; }
   margin-top: 4px;
 }
 
-/* ─── EPG Guide View ───────────────────────────────────────────────────────── */
-#viewEpg {
-  flex-direction: column;
+/* ─── EPG Guide Overlay ────────────────────────────────────────────────────── */
+.epg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
 }
+
+.epg-overlay.open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* Semi-transparent backdrop — click to close */
+.epg-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+}
+
+.epg-overlay-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: var(--topbar-h);
+  background: var(--bg);
+  transform: translateY(30px);
+  transition: transform .2s;
+}
+
+.epg-overlay.open .epg-overlay-panel {
+  transform: translateY(0);
+}
+
+.epg-overlay-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 5px 10px;
+  margin-left: 8px;
+  transition: border-color .2s, color .2s;
+  flex-shrink: 0;
+}
+.epg-overlay-close:hover { border-color: var(--accent); color: var(--accent); }
 
 .epg-guide-header {
   display: flex;

@@ -32,6 +32,7 @@
       <select class="bouquet-select" id="bouquetSelect">
         <option value="">Loading bouquets…</option>
       </select>
+      <input class="channel-search" id="channelSearch" type="search" placeholder="Search channels…" autocomplete="off" />
     </div>
     <div class="channel-list" id="channelList">
       <div class="list-placeholder">Please select a bouquet</div>
@@ -70,26 +71,29 @@
   </main>
 </div>
 
-<!-- ─── EPG Guide View ───────────────────────────────────────────────────── -->
-<div class="view" id="viewEpg">
-  <div class="epg-guide-header">
-    <div class="epg-guide-controls">
-      <select class="bouquet-select" id="epgBouquetSelect">
-        <option value="">Select bouquet…</option>
-      </select>
-      <button class="btn-secondary" id="epgLoadBtn">Load EPG</button>
+<!-- ─── EPG Guide Overlay ─────────────────────────────────────────────────── -->
+<div class="epg-overlay" id="epgOverlay" aria-hidden="true">
+  <div class="epg-overlay-panel">
+    <div class="epg-guide-header">
+      <div class="epg-guide-controls">
+        <select class="bouquet-select" id="epgBouquetSelect">
+          <option value="">Select bouquet…</option>
+        </select>
+        <button class="btn-secondary" id="epgLoadBtn">Load EPG</button>
+      </div>
+      <div class="epg-time-nav">
+        <button class="btn-icon" id="epgPrevBtn">◀</button>
+        <span class="epg-time-range" id="epgTimeRange"></span>
+        <button class="btn-icon" id="epgNextBtn">▶</button>
+        <button class="btn-secondary" id="epgNowBtn">Now</button>
+      </div>
+      <button class="epg-overlay-close" id="epgCloseBtn" title="Close">✕</button>
     </div>
-    <div class="epg-time-nav">
-      <button class="btn-icon" id="epgPrevBtn">◀</button>
-      <span class="epg-time-range" id="epgTimeRange"></span>
-      <button class="btn-icon" id="epgNextBtn">▶</button>
-      <button class="btn-secondary" id="epgNowBtn">Now</button>
-    </div>
-  </div>
 
-  <div class="epg-guide-container">
-    <div class="epg-guide-inner" id="epgGuide">
-      <div class="epg-guide-placeholder">Select a bouquet and load EPG</div>
+    <div class="epg-guide-container">
+      <div class="epg-guide-inner" id="epgGuide">
+        <div class="epg-guide-placeholder">Select a bouquet and load EPG</div>
+      </div>
     </div>
   </div>
 </div>

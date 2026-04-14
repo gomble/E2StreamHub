@@ -56,20 +56,38 @@
   setInterval(checkStatus, 30000);
 
   // ─── Navigation ───────────────────────────────────────────────────────────
+  const epgOverlay = document.getElementById('epgOverlay');
+
+  function openEpgOverlay() {
+    syncEpgBouquetSelect();
+    epgOverlay.classList.add('open');
+    epgOverlay.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeEpgOverlay() {
+    epgOverlay.classList.remove('open');
+    epgOverlay.setAttribute('aria-hidden', 'true');
+  }
+
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('view' + capitalize(btn.dataset.view)).classList.add('active');
-
       if (btn.dataset.view === 'epg') {
-        syncEpgBouquetSelect();
+        openEpgOverlay();
       }
     });
   });
 
-  function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  // Close on backdrop click (click on overlay but not the panel)
+  epgOverlay.addEventListener('click', e => {
+    if (e.target === epgOverlay) closeEpgOverlay();
+  });
+
+  document.getElementById('epgCloseBtn').addEventListener('click', closeEpgOverlay);
+
+  // Close on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && epgOverlay.classList.contains('open')) closeEpgOverlay();
+  });
 
   // ─── Logout ───────────────────────────────────────────────────────────────
   document.getElementById('logoutBtn').addEventListener('click', async () => {
@@ -96,6 +114,7 @@
   }
 
   bouquetSelect.addEventListener('change', () => {
+    document.getElementById('channelSearch').value = '';
     if (bouquetSelect.value) loadChannels(bouquetSelect.value);
   });
 
@@ -131,10 +150,41 @@
 
       // Load short EPG for channel list (debounced / lightweight)
       loadChannelListEpg(services.slice(0, 40));
+
+      // Apply any pending search term
+      applyChannelSearch(document.getElementById('channelSearch').value);
     } catch (e) {
       channelList.innerHTML = `<div class="list-placeholder">Error: ${escHtml(e.message)}</div>`;
     }
   }
+
+  // ─── Channel search ────────────────────────────────────────────────────────
+  function applyChannelSearch(term) {
+    const q = term.trim().toLowerCase();
+    let visibleCount = 0;
+    channelList.querySelectorAll('.channel-item').forEach(item => {
+      const name = (item.dataset.name || '').toLowerCase();
+      const matches = !q || name.includes(q);
+      item.style.display = matches ? '' : 'none';
+      if (matches) visibleCount++;
+    });
+    // Show/hide a no-results placeholder
+    let noRes = channelList.querySelector('.search-no-results');
+    if (q && visibleCount === 0) {
+      if (!noRes) {
+        noRes = document.createElement('div');
+        noRes.className = 'list-placeholder search-no-results';
+        channelList.appendChild(noRes);
+      }
+      noRes.textContent = `No results for "${term}"`;
+    } else if (noRes) {
+      noRes.remove();
+    }
+  }
+
+  document.getElementById('channelSearch').addEventListener('input', e => {
+    applyChannelSearch(e.target.value);
+  });
 
   async function loadChannelListEpg(services) {
     // Load EPG for visible channels in background to show "now playing" in list
@@ -146,7 +196,7 @@
         const current = events.find(e => e.begin_timestamp <= now && (e.begin_timestamp + e.duration_sec) > now);
         if (current) {
           const el = document.getElementById(`cnow-${sanitizeId(svc.servicereference)}`);
-          if (el) el.textContent = current.title || '';
+          if (el) el.textContent = decodeHtml(current.title || '');
         }
       } catch { /* skip */ }
       await sleep(50);
@@ -409,8 +459,8 @@
         div.className = `epg-event${isCurrent ? ' current' : ''}`;
         div.innerHTML = `
           <div class="epg-event-time">${timeStr}</div>
-          <div class="epg-event-title">${escHtml(evt.title || '–')}</div>
-          ${evt.shortdesc ? `<div class="epg-event-desc">${escHtml(evt.shortdesc)}</div>` : ''}
+          <div class="epg-event-title">${escHtml(decodeHtml(evt.title || '–'))}</div>
+          ${evt.shortdesc ? `<div class="epg-event-desc">${escHtml(decodeHtml(evt.shortdesc))}</div>` : ''}
           <div class="epg-event-duration">${durMin} min</div>
         `;
         epgContent.appendChild(div);
@@ -429,7 +479,7 @@
   function updateNowPlayingBar(channelName, evt, now) {
     nowPlaying.style.display = 'flex';
     npChannel.textContent = channelName;
-    npTitle.textContent = evt.title || '';
+    npTitle.textContent = decodeHtml(evt.title || '');
     const start = evt.begin_timestamp;
     const end = start + evt.duration_sec;
     const startDate = new Date(start * 1000);
@@ -468,6 +518,13 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // Decode HTML entities returned by the OpenWebif API (e.g. &#x27; → ')
+  const _decodeEl = document.createElement('textarea');
+  function decodeHtml(str) {
+    _decodeEl.innerHTML = String(str || '');
+    return _decodeEl.value;
   }
 
   function fmtTime(date) {
@@ -515,6 +572,7 @@
   window._app = {
     apiFetch,
     escHtml,
+    decodeHtml,
     fmtTime,
     tuneChannel,
     bouquetSelect,
