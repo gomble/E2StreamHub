@@ -447,12 +447,16 @@ function parseBouquetFile(content) {
 
     const parts = sRef.split(':');
     const svcTypePart = (parts[1] || '').toLowerCase();
-    const isMarker = svcTypePart === '832' || parseInt(svcTypePart, 16) === 0x832;
+    const svcTypeNum  = parseInt(svcTypePart, 16);
+    // 0x64 = numbered marker (most common), 0x832 = Enigma2 marker variant
+    const isMarker    = svcTypeNum === 0x64 || svcTypeNum === 0x832;
     const isSubBouquet = sRef.toUpperCase().includes('FROM BOUQUET');
     const id = `i${++seq}_${Date.now()}`;
 
     if (isMarker) {
-      items.push({ type: 'marker', sRef, label: description, id });
+      // Label can be in #DESCRIPTION or embedded in sRef after "::"
+      const embeddedLabel = sRef.includes('::') ? sRef.split('::').pop() : '';
+      items.push({ type: 'marker', sRef, label: description || embeddedLabel, id });
     } else if (isSubBouquet) {
       items.push({ type: 'subbouquet', sRef, label: description, id });
     } else {
@@ -464,12 +468,25 @@ function parseBouquetFile(content) {
 
 function serializeBouquetFile(name, items) {
   let out = `#NAME ${name}\n`;
+  let markerSeq = 0;
   for (const item of items) {
-    // New markers created in the editor may not have a sRef — generate the standard one
-    const sRef = item.sRef || (item.type === 'marker' ? '1:832:1:0:0:0:0:0:0:0:' : null);
-    if (!sRef) continue; // skip items without a valid sRef
-    out += `#SERVICE ${sRef}\n`;
+    let sRef = item.sRef;
     const label = item.type === 'service' ? (item.name || '') : (item.label || '');
+
+    if (!sRef) {
+      if (item.type === 'marker') {
+        // Use the 0x64 marker format — embed label in the sRef as Enigma2 expects
+        sRef = `1:64:${markerSeq++}:0:0:0:0:0:0:0::${label}`;
+      } else {
+        continue; // skip items without a valid sRef
+      }
+    } else if (item.type === 'marker' && !sRef.includes('::') && label) {
+      // Existing marker sRef without embedded label — patch it in
+      const base = sRef.replace(/:+$/, '');
+      sRef = `${base}::${label}`;
+    }
+
+    out += `#SERVICE ${sRef}\n`;
     out += `#DESCRIPTION ${label}\n`;
   }
   return out;

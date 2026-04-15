@@ -160,7 +160,14 @@
     scheduleSave();
   }
 
-  nameInput.addEventListener('input', markDirty);
+  nameInput.addEventListener('input', () => {
+    markDirty();
+    // Update the dropdown option text immediately so the user sees the new name
+    if (currentBRef) {
+      const opt = bqSelect.querySelector(`option[value="${currentBRef.replace(/"/g, '\\"')}"]`);
+      if (opt) opt.textContent = nameInput.value.trim() || currentBRef;
+    }
+  });
 
   // ─── Auto-save ────────────────────────────────────────────────────────────
   function scheduleSave() {
