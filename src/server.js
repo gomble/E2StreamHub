@@ -260,6 +260,26 @@ function bouquetFilePath(bRef) {
   return m ? `/etc/enigma2/${m[1]}` : null;
 }
 
+// Reload Enigma2 service list so changes appear in OpenWebif and on the receiver.
+// Tries several endpoints in sequence until one succeeds.
+async function reloadEnigmaServices() {
+  const attempts = [
+    '/api/reloadservices',
+    '/api/servicelisteditor?cmd=reload',
+    '/web/servicelisteditor?cmd=reload',
+  ];
+  for (const path of attempts) {
+    try {
+      await enigmaGet(path);
+      console.log('[reload] success via', path);
+      return;
+    } catch (err) {
+      console.warn('[reload] failed via', path, '–', err.message);
+    }
+  }
+  console.error('[reload] all reload attempts failed');
+}
+
 // ─── SSH helpers (SFTP fallback when OpenWebif file API is unavailable) ───────
 
 function sshConnect() {
@@ -439,7 +459,7 @@ app.post('/api/bouquetedit', requireAuth, async (req, res) => {
     return res.status(403).json({ error: 'Invalid path' });
   try {
     await enigmaWriteFile(filePath, serializeBouquetFile(name, items));
-    enigmaGet('/api/reloadservices').catch(() => {});
+    await reloadEnigmaServices();
     res.json({ ok: true });
   } catch (err) {
     console.error('[bouquetedit] write error:', err.message);
@@ -468,7 +488,7 @@ app.post('/api/createbouquet', requireAuth, async (req, res) => {
     } catch (e) {
       console.warn('[createbouquet] bouquets.tv update failed:', e.message);
     }
-    enigmaGet('/api/reloadservices').catch(() => {});
+    reloadEnigmaServices();
     res.json({ ok: true, bRef, name: name.trim(), filePath });
   } catch (err) {
     console.error('[createbouquet] error:', err.message);
