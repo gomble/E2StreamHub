@@ -206,6 +206,15 @@
   });
 
   // ─── Channels ─────────────────────────────────────────────────────────────
+  function piconUrl(sRef) {
+    return `/picon/${encodeURIComponent(sRef)}`;
+  }
+
+  function piconImg(sRef) {
+    const url = piconUrl(sRef);
+    return `<img class="picon" src="${url}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+  }
+
   function renderChannelList(services, bouquetRef) {
     channelList.innerHTML = '';
     services.forEach((svc, idx) => {
@@ -216,6 +225,7 @@
       item.dataset.bouquet = bouquetRef;
       item.innerHTML = `
         <span class="channel-num">${idx + 1}</span>
+        ${piconImg(svc.servicereference)}
         <span class="channel-name">${escHtml(svc.servicename)}</span>
         <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
       `;
@@ -339,6 +349,7 @@
       }
 
       item.innerHTML = `
+        ${piconImg(svc.servicereference)}
         <span class="channel-name" style="padding-left:0">${highlighted}</span>
         <span class="channel-now" id="cnow-${sanitizeId(svc.servicereference)}"></span>
       `;
@@ -652,7 +663,9 @@
 
   function updateNowPlayingBar(channelName, evt, now) {
     nowPlaying.style.display = 'flex';
-    npChannel.textContent = channelName;
+    npChannel.innerHTML = currentSRef
+      ? `${piconImg(currentSRef)}<span>${escHtml(channelName)}</span>`
+      : escHtml(channelName);
     npTitle.textContent = decodeHtml(evt.title || '');
     const start = evt.begin_timestamp;
     const end = start + evt.duration_sec;
@@ -757,6 +770,7 @@
     openEventModal,
     tuneChannel,
     bouquetSelect,
+    piconImg,
     get allBouquets() { return allBouquets; },
     channelCache,
   };

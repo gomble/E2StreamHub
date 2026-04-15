@@ -258,6 +258,31 @@ input { font-family: inherit; }
   max-width: 120px;
 }
 
+/* ─── Picons ────────────────────────────────────────────────────────────────── */
+.picon {
+  width: 32px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.now-playing-channel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.now-playing-channel .picon {
+  width: 36px;
+  height: 22px;
+}
+
+.ed-item .picon {
+  width: 28px;
+  height: 18px;
+}
+
 /* ─── Main Content ─────────────────────────────────────────────────────────── */
 .main-content {
   flex: 1;

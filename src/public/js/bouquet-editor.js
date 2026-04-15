@@ -133,7 +133,9 @@
     div.className = 'ed-item' + (item.type === 'marker' ? ' ed-item-marker' : '');
     div.dataset.id = domId;
     const label = item.type === 'marker' ? (item.label || 'Marker') : (item.name || '');
-    const icon  = item.type === 'marker' ? '<span class="ed-marker-icon">📌</span>' : '';
+    const icon  = item.type === 'marker'
+      ? '<span class="ed-marker-icon">📌</span>'
+      : (item.sRef ? (window._app?.piconImg(item.sRef) || '') : '');
     div.innerHTML = `
       <span class="ed-handle" title="Verschieben">⠿</span>
       ${icon}
@@ -371,6 +373,7 @@
           escHtml(svc.servicename.slice(ix + q.length));
       }
       el.innerHTML = `
+        ${window._app?.piconImg(svc.servicereference) || ''}
         <span class="channel-name" style="padding-left:0">${namePart}</span>
         <button class="ed-add-btn">${already ? '✓' : '+'}</button>
       `;

@@ -199,6 +199,25 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 
+// Proxy picon images from the receiver (avoids CORS + auth issues in browser)
+// The receiver expects the sRef with colons replaced by underscores, no trailing colon.
+app.get('/picon/:sref', requireAuth, async (req, res) => {
+  try {
+    const raw  = decodeURIComponent(req.params.sref);
+    // Normalize: strip trailing colons, replace : with _
+    const name = raw.replace(/:+$/, '').replace(/:/g, '_');
+    const url  = `${enigmaBase}/picon/${name}.png`;
+    const config = { responseType: 'stream', timeout: 5000 };
+    if (enigmaAuth) config.auth = enigmaAuth;
+    const response = await axios.get(url, config);
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    response.data.pipe(res);
+  } catch {
+    res.status(404).end();
+  }
+});
+
 app.get('/api/bouquets', requireAuth, async (req, res) => {
   try {
     const data = await enigmaGet('/api/bouquets');
