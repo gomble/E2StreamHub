@@ -29,7 +29,6 @@
   const srcList         = document.getElementById('editorChannelList');
   const leftPanel       = document.getElementById('editorLeft');
   const rightPanel      = document.getElementById('editorRight');
-  const piconPathSelect = document.getElementById('edPiconPathSelect');
   const piconFileInput  = document.getElementById('edPiconFileInput');
 
   // Currently pending picon upload target
@@ -45,37 +44,12 @@
   const newBqConfirm  = document.getElementById('edNewBqConfirm');
   const newBqCancel   = document.getElementById('edNewBqCancel');
 
-  // ─── Picon path detection ─────────────────────────────────────────────────
-  async function loadPiconPaths() {
-    try {
-      const data = await window._app.apiFetch('/api/piconpaths');
-      piconPathSelect.innerHTML = '';
-      if (data.paths.length === 0) {
-        // No directory found — show all known ones as manual options
-        piconPathSelect.appendChild(new Option('Kein Ordner gefunden', ''));
-        data.known.forEach(p => piconPathSelect.appendChild(new Option(p, p)));
-      } else {
-        data.paths.forEach((p, i) => {
-          const opt = new Option(p.split('/').pop() + '  (' + p + ')', p);
-          if (i === 0) opt.selected = true;
-          piconPathSelect.appendChild(opt);
-        });
-        // Also add known ones not already found as fallback options
-        data.known.filter(p => !data.paths.includes(p))
-          .forEach(p => piconPathSelect.appendChild(new Option('➕ ' + p, p)));
-      }
-    } catch {
-      piconPathSelect.innerHTML = '<option value="">Fehler beim Laden</option>';
-    }
-  }
-
   // ─── Picon upload ─────────────────────────────────────────────────────────
   piconFileInput.addEventListener('change', async () => {
     const file = piconFileInput.files[0];
     const sRef = piconUploadSRef;
-    const piconPath = piconPathSelect.value;
     piconFileInput.value = '';
-    if (!file || !sRef || !piconPath) return;
+    if (!file || !sRef) return;
 
     setStatus('Picon wird hochgeladen…');
     try {
@@ -83,21 +57,22 @@
       const res = await fetch('/api/picon/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sRef, piconPath, imageBase64: base64 }),
+        body: JSON.stringify({ sRef, imageBase64: base64 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      // Bust the browser cache for this picon and refresh all matching images
+      // Bust browser cache and refresh all matching picon images on the page
       const cacheBust = `?t=${Date.now()}`;
-      const piconName = sRef.replace(/:+$/, '').replace(/:/g, '_');
-      document.querySelectorAll(`.picon[src*="${encodeURIComponent(sRef)}"], .picon[src*="${piconName}"]`)
+      document.querySelectorAll(`.picon`)
         .forEach(img => {
-          img.style.display = '';
-          img.src = `/picon/${encodeURIComponent(sRef)}${cacheBust}`;
+          if (img.src.includes(encodeURIComponent(sRef))) {
+            img.style.display = '';
+            img.src = `/picon/${encodeURIComponent(sRef)}${cacheBust}`;
+          }
         });
 
-      setStatus(`Picon gespeichert: ${data.filename}`, 4000);
+      setStatus(`Picon gespeichert ✓  (${data.piconDir})`, 5000);
     } catch (e) {
       setStatus(`Picon-Fehler: ${e.message}`);
     }
@@ -116,7 +91,6 @@
   // ─── Open / Close ─────────────────────────────────────────────────────────
   function open() {
     populateSelects();
-    loadPiconPaths();
     activateTab('edit');
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');

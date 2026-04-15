@@ -314,35 +314,6 @@ input { font-family: inherit; }
 
 .ed-item .picon { width: 32px; height: 20px; }
 
-/* Picon path selector in editor header */
-.ed-picon-path-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 1;
-  min-width: 0;
-}
-.ed-picon-path-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.ed-picon-path-select {
-  background: var(--bg4);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  font-size: 11px;
-  padding: 4px 6px;
-  outline: none;
-  max-width: 180px;
-  cursor: pointer;
-}
-.ed-picon-path-select:focus { border-color: var(--accent); }
-
-@media (max-width: 768px) {
-  .ed-picon-path-wrap { display: none; }
-}
 
 /* ─── Main Content ─────────────────────────────────────────────────────────── */
 .main-content {
@@ -982,18 +953,31 @@ input { font-family: inherit; }
 .editor-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 10px 16px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   gap: 12px;
-  flex-wrap: wrap;
 }
-.editor-header-left, .editor-header-right {
+.editor-header-left {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+}
+.editor-header-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 2;
+  justify-content: center;
+}
+.editor-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
 }
 .editor-title {
   font-size: 14px;
@@ -1002,7 +986,8 @@ input { font-family: inherit; }
   white-space: nowrap;
 }
 .editor-bq-select {
-  max-width: 220px;
+  max-width: 280px;
+  flex: 1;
 }
 .editor-status {
   font-size: 12px;

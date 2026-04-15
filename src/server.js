@@ -9,7 +9,7 @@ const { spawn } = require('child_process');
 const { Client: SshClient } = require('ssh2');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 2000;
 
 const ENIGMA2_HOST = process.env.ENIGMA2_HOST || '192.168.1.100';
 const ENIGMA2_PORT = parseInt(process.env.ENIGMA2_PORT || '80', 10);
@@ -236,63 +236,69 @@ function sRefToPiconName(sRef) {
   return String(sRef).replace(/:+$/, '').replace(/:/g, '_');
 }
 
-// Detect available picon directories via SSH
-app.get('/api/piconpaths', requireAuth, async (req, res) => {
-  const found = [];
+// Auto-detect the best picon directory and cache the result
+let _piconDirCache = null;
 
+async function detectPiconDir() {
+  if (_piconDirCache) return _piconDirCache;
+
+  // 1. Try Enigma2 settings file for a configured path
+  try {
+    const settings = await enigmaReadFile('/etc/enigma2/settings');
+    const m = settings.match(/config\.(?:DreamPlex\.piconpath|plugins\.piconcockpit\.iconpath)\s*=\s*(.+)/);
+    if (m) {
+      const p = m[1].trim();
+      if (p) { _piconDirCache = p; return p; }
+    }
+  } catch {}
+
+  // 2. SSH scan of known directories — return first that exists
   if (ENIGMA2_USER) {
     let conn;
     try {
       conn = await sshConnect();
-      await new Promise((resolve, reject) => {
+      const found = await new Promise((resolve, reject) => {
         conn.sftp((err, sftp) => {
           if (err) { conn.end(); return reject(err); }
           let pending = KNOWN_PICON_DIRS.length;
+          let result = null;
           KNOWN_PICON_DIRS.forEach(dir => {
             sftp.stat(dir, (statErr, attrs) => {
-              if (!statErr && attrs && attrs.isDirectory()) found.push(dir);
-              if (--pending === 0) { conn.end(); resolve(); }
+              if (!result && !statErr && attrs && attrs.isDirectory()) result = dir;
+              if (--pending === 0) { conn.end(); resolve(result); }
             });
           });
         });
       });
+      if (found) { _piconDirCache = found; return found; }
     } catch (e) {
       if (conn) try { conn.end(); } catch {}
-      console.warn('[piconpaths] SSH scan failed:', e.message);
+      console.warn('[picondir] SSH scan failed:', e.message);
     }
   }
 
-  // Also try to read the configured path from Enigma2 settings
-  try {
-    const settings = await enigmaReadFile('/etc/enigma2/settings');
-    const m = settings.match(/config\.DreamPlex\.piconpath\s*=\s*(.+)|config\.plugins\.piconcockpit\.iconpath\s*=\s*(.+)/);
-    if (m) {
-      const p = (m[1] || m[2]).trim();
-      if (p && !found.includes(p)) found.unshift(p);
-    }
-  } catch {}
+  // 3. Fallback to most common path
+  const fallback = '/usr/share/enigma2/picons';
+  _piconDirCache = fallback;
+  return fallback;
+}
 
-  res.json({ paths: found, known: KNOWN_PICON_DIRS });
-});
-
-// Upload a picon for a service — body: { sRef, piconPath, imageBase64 }
+// Upload a picon for a service — body: { sRef, imageBase64 }
 app.post('/api/picon/upload', requireAuth, express.json({ limit: '2mb' }), async (req, res) => {
-  const { sRef, piconPath, imageBase64 } = req.body;
-  if (!sRef || !piconPath || !imageBase64)
+  const { sRef, imageBase64 } = req.body;
+  if (!sRef || !imageBase64)
     return res.status(400).json({ error: 'Missing fields' });
-  if (!piconPath.startsWith('/'))
-    return res.status(403).json({ error: 'Invalid path' });
-
-  const filename = sRefToPiconName(sRef) + '.png';
-  const remotePath = `${piconPath.replace(/\/$/, '')}/${filename}`;
 
   try {
-    // Decode base64 (strip data URI prefix if present)
-    const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const buf = Buffer.from(base64, 'base64');
+    const piconDir  = await detectPiconDir();
+    const filename  = sRefToPiconName(sRef) + '.png';
+    const remotePath = `${piconDir.replace(/\/$/, '')}/${filename}`;
 
-    await sshWriteFile(remotePath, buf);
-    res.json({ ok: true, remotePath, filename });
+    const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    await sshWriteFile(remotePath, Buffer.from(base64, 'base64'));
+
+    console.log('[picon/upload] saved to', remotePath);
+    res.json({ ok: true, remotePath, filename, piconDir });
   } catch (e) {
     console.error('[picon/upload] error:', e.message);
     res.status(502).json({ error: e.message });
