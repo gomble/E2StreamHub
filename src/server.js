@@ -261,23 +261,66 @@ function bouquetFilePath(bRef) {
 }
 
 // Reload Enigma2 service list so changes appear in OpenWebif and on the receiver.
-// Tries several endpoints in sequence until one succeeds.
+// Tries HTTP endpoints first, then SSH exec as final fallback.
 async function reloadEnigmaServices() {
-  const attempts = [
+  const httpPaths = [
     '/api/reloadservices',
+    '/web/reloadservices',
     '/api/servicelisteditor?cmd=reload',
     '/web/servicelisteditor?cmd=reload',
   ];
-  for (const path of attempts) {
+  for (const path of httpPaths) {
     try {
       await enigmaGet(path);
-      console.log('[reload] success via', path);
+      console.log('[reload] success via HTTP', path);
       return;
     } catch (err) {
-      console.warn('[reload] failed via', path, '–', err.message);
+      console.warn('[reload] failed via HTTP', path, '–', err.message);
     }
   }
-  console.error('[reload] all reload attempts failed');
+
+  // SSH fallback: call Enigma2's Python API directly
+  if (ENIGMA2_USER) {
+    try {
+      await sshExec(
+        'python -c "from enigma import eServiceCenter; eServiceCenter.getInstance().reloadServiceList()"'
+      );
+      console.log('[reload] success via SSH python');
+      return;
+    } catch (err) {
+      console.warn('[reload] SSH python failed –', err.message);
+    }
+    // Some receivers use python3
+    try {
+      await sshExec(
+        'python3 -c "from enigma import eServiceCenter; eServiceCenter.getInstance().reloadServiceList()"'
+      );
+      console.log('[reload] success via SSH python3');
+      return;
+    } catch (err) {
+      console.warn('[reload] SSH python3 failed –', err.message);
+    }
+  }
+
+  console.error('[reload] all reload attempts failed – changes saved but receiver not reloaded');
+}
+
+function sshExec(command) {
+  return new Promise(async (resolve, reject) => {
+    let conn;
+    try { conn = await sshConnect(); } catch (e) { return reject(e); }
+    conn.exec(command, (err, stream) => {
+      if (err) { conn.end(); return reject(err); }
+      let out = '';
+      stream.on('data', d => { out += d; });
+      stream.stderr.on('data', d => { out += d; });
+      stream.on('close', code => {
+        conn.end();
+        if (code === 0) resolve(out.trim());
+        else reject(new Error(`exit ${code}: ${out.trim()}`));
+      });
+    });
+  });
 }
 
 // ─── SSH helpers (SFTP fallback when OpenWebif file API is unavailable) ───────
