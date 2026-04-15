@@ -484,6 +484,22 @@ app.get('/api/bouquetedit', requireAuth, async (req, res) => {
   try {
     const content = await enigmaReadFile(filePath);
     const parsed  = parseBouquetFile(content);
+
+    // Some bouquet files have #SERVICE lines but no #DESCRIPTION lines.
+    // Fill in missing service names from the OpenWebif services API.
+    const unnamed = parsed.items.filter(i => i.type === 'service' && !i.name);
+    if (unnamed.length > 0) {
+      try {
+        const svcData = await enigmaGet('/api/getservices', { sRef: bRef });
+        const nameMap = new Map((svcData.services || []).map(s => [s.servicereference, s.servicename]));
+        parsed.items.forEach(item => {
+          if (item.type === 'service' && !item.name) {
+            item.name = nameMap.get(item.sRef) || item.sRef;
+          }
+        });
+      } catch { /* leave sRef as fallback label */ }
+    }
+
     return res.json({ ...parsed, filePath });
   } catch (readErr) {
     console.warn('[bouquetedit] file read failed:', readErr.message, '– reconstructing from getservices');
