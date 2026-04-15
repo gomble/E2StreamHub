@@ -279,30 +279,39 @@ async function reloadEnigmaServices() {
     }
   }
 
-  // SSH fallback: call Enigma2's Python API directly
+  // SSH fallbacks
   if (ENIGMA2_USER) {
-    try {
-      await sshExec(
-        'python -c "from enigma import eServiceCenter; eServiceCenter.getInstance().reloadServiceList()"'
-      );
-      console.log('[reload] success via SSH python');
-      return;
-    } catch (err) {
-      console.warn('[reload] SSH python failed –', err.message);
+    // 1. Call OpenWebif from within the receiver (bypasses any network auth issues)
+    for (const path of ['/api/reloadservices', '/web/reloadservices']) {
+      try {
+        const out = await sshExec(`curl -sf "http://localhost:${ENIGMA2_PORT}${path}"`);
+        console.log('[reload] success via SSH curl localhost', path, out?.slice(0, 80));
+        return;
+      } catch (err) {
+        console.warn('[reload] SSH curl localhost', path, 'failed –', err.message);
+      }
     }
-    // Some receivers use python3
+
+    // 2. Send SIGUSR1 to enigma2 — triggers service-list reload on many images
     try {
-      await sshExec(
-        'python3 -c "from enigma import eServiceCenter; eServiceCenter.getInstance().reloadServiceList()"'
-      );
-      console.log('[reload] success via SSH python3');
+      await sshExec('kill -USR1 $(pidof enigma2)');
+      console.log('[reload] success via SIGUSR1');
       return;
     } catch (err) {
-      console.warn('[reload] SSH python3 failed –', err.message);
+      console.warn('[reload] SIGUSR1 failed –', err.message);
+    }
+
+    // 3. SIGHUP — some images use this for soft-reload
+    try {
+      await sshExec('kill -HUP $(pidof enigma2)');
+      console.log('[reload] success via SIGHUP');
+      return;
+    } catch (err) {
+      console.warn('[reload] SIGHUP failed –', err.message);
     }
   }
 
-  console.error('[reload] all reload attempts failed – changes saved but receiver not reloaded');
+  console.error('[reload] all reload attempts failed – file was saved, restart Enigma2 manually to apply changes');
 }
 
 function sshExec(command) {
