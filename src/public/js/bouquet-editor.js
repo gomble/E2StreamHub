@@ -95,7 +95,10 @@
       currentItems     = data.items || [];
       nextId = 1;
       currentItems.forEach(it => { it._id = nextId++; });
-      nameInput.value = data.name || '';
+      // When file access is unavailable the server derives the name from the
+      // filename (e.g. "news") — use the real display name from allBouquets instead.
+      const realName = (window._app?.allBouquets || []).find(b => b.ref === bRef)?.name;
+      nameInput.value = realName || data.name || '';
       editorDirty = false;
       renderSortable();
       const n    = currentItems.filter(i => i.type === 'service').length;
