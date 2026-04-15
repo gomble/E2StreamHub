@@ -264,10 +264,10 @@ function bouquetFilePath(bRef) {
 // Tries HTTP endpoints first, then SSH exec as final fallback.
 async function reloadEnigmaServices() {
   const httpPaths = [
+    '/api/servicelistreload?mode=2',   // UserBouquets — correct endpoint per OpenWebif docs
+    '/web/servicelistreload?mode=2',
     '/api/reloadservices',
     '/web/reloadservices',
-    '/api/servicelisteditor?cmd=reload',
-    '/web/servicelisteditor?cmd=reload',
   ];
   for (const path of httpPaths) {
     try {
@@ -282,7 +282,7 @@ async function reloadEnigmaServices() {
   // SSH fallbacks
   if (ENIGMA2_USER) {
     // 1. Call OpenWebif from within the receiver (bypasses any network auth issues)
-    for (const path of ['/api/reloadservices', '/web/reloadservices']) {
+    for (const path of ['/api/servicelistreload?mode=2', '/web/servicelistreload?mode=2']) {
       try {
         const out = await sshExec(`curl -sf "http://localhost:${ENIGMA2_PORT}${path}"`);
         console.log('[reload] success via SSH curl localhost', path, out?.slice(0, 80));
