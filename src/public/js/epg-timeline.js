@@ -63,21 +63,30 @@
       const BATCH = 6;
       const eventsByRef = {};
       let done = 0;
+      const cache = window._epgCache || {};
 
       for (let i = 0; i < services.length; i += BATCH) {
         const batch = services.slice(i, i + BATCH);
         await Promise.all(batch.map(async svc => {
-          try {
-            const data = await window._app.apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
-            eventsByRef[svc.servicereference] = data.events || [];
-          } catch {
-            eventsByRef[svc.servicereference] = [];
+          const sref = svc.servicereference;
+          // Use preloaded cache if available — avoids double-fetching
+          if (cache[sref]) {
+            eventsByRef[sref] = cache[sref];
+          } else {
+            try {
+              const data = await window._app.apiFetch(`/api/epg?sRef=${encodeURIComponent(sref)}`);
+              eventsByRef[sref] = data.events || [];
+              cache[sref] = eventsByRef[sref]; // store back
+            } catch {
+              eventsByRef[sref] = [];
+            }
           }
           done++;
           const loading = epgGuide.querySelector('.epg-guide-loading');
           if (loading) loading.textContent = `Loading EPG (${done} / ${services.length})…`;
         }));
       }
+      window._epgCache = cache;
 
       guideData = services.map(svc => ({
         name: svc.servicename,

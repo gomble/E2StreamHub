@@ -194,15 +194,70 @@
         opt.textContent = name;
         bouquetSelect.appendChild(opt);
       });
+
+      // Restore last used bouquet
+      const lastBouquet = localStorage.getItem('lastBouquet');
+      if (lastBouquet && allBouquets.some(b => b.ref === lastBouquet)) {
+        bouquetSelect.value = lastBouquet;
+        await loadChannels(lastBouquet);
+        // After channels load, preload EPG in background
+        scheduleEpgPreload(lastBouquet);
+      }
     } catch (e) {
       bouquetSelect.innerHTML = '<option value="">Failed to load</option>';
       console.error('Bouquet load error:', e);
     }
   }
 
+  // ─── Background EPG preload ────────────────────────────────────────────────
+  // Preloads EPG data for the current bouquet so EPG Guide is ready instantly.
+  let epgPreloadTimer = null;
+
+  function scheduleEpgPreload(bouquetRef) {
+    clearTimeout(epgPreloadTimer);
+    // Wait 8s after channel load before hitting the receiver with EPG requests
+    epgPreloadTimer = setTimeout(() => preloadEpgForBouquet(bouquetRef), 8000);
+  }
+
+  async function preloadEpgForBouquet(bouquetRef) {
+    try {
+      const svcData  = await apiFetch(`/api/services?sRef=${encodeURIComponent(bouquetRef)}`);
+      const services = (svcData.services || []).slice(0, 50);
+      if (!services.length) return;
+
+      // Use the same batched approach as epg-timeline.js
+      const BATCH = 6;
+      for (let i = 0; i < services.length; i += BATCH) {
+        const batch = services.slice(i, i + BATCH);
+        await Promise.all(batch.map(async svc => {
+          try {
+            const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
+            // epg-timeline.js reads from window._epgCache — store there for it to pick up
+            if (!window._epgCache) window._epgCache = {};
+            window._epgCache[svc.servicereference] = data.events || [];
+          } catch { /* skip */ }
+        }));
+        // Small pause between batches to avoid hammering the receiver
+        await sleep(200);
+      }
+
+      // Pre-select the bouquet in the EPG overlay select
+      syncEpgBouquetSelect();
+      const epgBq = document.getElementById('epgBouquetSelect');
+      if (epgBq && bouquetRef) epgBq.value = bouquetRef;
+
+      console.log('[epg-preload] done for', bouquetRef);
+    } catch (e) {
+      console.warn('[epg-preload] failed:', e.message);
+    }
+  }
+
   bouquetSelect.addEventListener('change', () => {
     document.getElementById('channelSearch').value = '';
-    if (bouquetSelect.value) loadChannels(bouquetSelect.value);
+    if (bouquetSelect.value) {
+      localStorage.setItem('lastBouquet', bouquetSelect.value);
+      loadChannels(bouquetSelect.value);
+    }
   });
 
   // ─── Channels ─────────────────────────────────────────────────────────────
@@ -612,6 +667,10 @@
     // Load EPG for the selected channel
     loadEpgPanel(sRef, name);
     startEpgRefresh(sRef, name);
+
+    // Schedule background EPG preload for the active bouquet
+    const activeBouquet = bouquetSelect.value;
+    if (activeBouquet) scheduleEpgPreload(activeBouquet);
   }
 
   // ─── EPG Side Panel ───────────────────────────────────────────────────────
@@ -685,8 +744,12 @@
   function syncEpgBouquetSelect() {
     const epgBouquetSelect = document.getElementById('epgBouquetSelect');
     epgBouquetSelect.innerHTML = bouquetSelect.innerHTML;
+    // Pre-select whatever is active in the player
     epgBouquetSelect.value = bouquetSelect.value;
   }
+
+  // Also expose so preloadEpgForBouquet can call it before the overlay opens
+  window._syncEpgBouquetSelect = syncEpgBouquetSelect;
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   async function apiFetch(url) {
