@@ -15,20 +15,25 @@
   let searchTimer     = null;
 
   // ─── Elements ─────────────────────────────────────────────────────────────
-  const overlay      = document.getElementById('editorOverlay');
-  const bqSelect     = document.getElementById('editorBouquetSelect');
-  const newBqBtn     = document.getElementById('editorNewBouquetBtn');
-  const statusEl     = document.getElementById('editorStatus');
-  const closeBtn     = document.getElementById('editorCloseBtn');
-  const sortableEl   = document.getElementById('editorSortable');
-  const emptyEl      = document.getElementById('editorEmpty');
-  const nameInput    = document.getElementById('editorBouquetName');
-  const markerBtn    = document.getElementById('editorAddMarkerBtn');
-  const srcSelect    = document.getElementById('editorSourceSelect');
-  const searchInput  = document.getElementById('editorSearch');
-  const srcList      = document.getElementById('editorChannelList');
-  const leftPanel    = document.getElementById('editorLeft');
-  const rightPanel   = document.getElementById('editorRight');
+  const overlay         = document.getElementById('editorOverlay');
+  const bqSelect        = document.getElementById('editorBouquetSelect');
+  const newBqBtn        = document.getElementById('editorNewBouquetBtn');
+  const statusEl        = document.getElementById('editorStatus');
+  const closeBtn        = document.getElementById('editorCloseBtn');
+  const sortableEl      = document.getElementById('editorSortable');
+  const emptyEl         = document.getElementById('editorEmpty');
+  const nameInput       = document.getElementById('editorBouquetName');
+  const markerBtn       = document.getElementById('editorAddMarkerBtn');
+  const srcSelect       = document.getElementById('editorSourceSelect');
+  const searchInput     = document.getElementById('editorSearch');
+  const srcList         = document.getElementById('editorChannelList');
+  const leftPanel       = document.getElementById('editorLeft');
+  const rightPanel      = document.getElementById('editorRight');
+  const piconPathSelect = document.getElementById('edPiconPathSelect');
+  const piconFileInput  = document.getElementById('edPiconFileInput');
+
+  // Currently pending picon upload target
+  let piconUploadSRef = null;
 
   // Dialogs
   const markerDialog  = document.getElementById('edMarkerDialog');
@@ -40,9 +45,78 @@
   const newBqConfirm  = document.getElementById('edNewBqConfirm');
   const newBqCancel   = document.getElementById('edNewBqCancel');
 
+  // ─── Picon path detection ─────────────────────────────────────────────────
+  async function loadPiconPaths() {
+    try {
+      const data = await window._app.apiFetch('/api/piconpaths');
+      piconPathSelect.innerHTML = '';
+      if (data.paths.length === 0) {
+        // No directory found — show all known ones as manual options
+        piconPathSelect.appendChild(new Option('Kein Ordner gefunden', ''));
+        data.known.forEach(p => piconPathSelect.appendChild(new Option(p, p)));
+      } else {
+        data.paths.forEach((p, i) => {
+          const opt = new Option(p.split('/').pop() + '  (' + p + ')', p);
+          if (i === 0) opt.selected = true;
+          piconPathSelect.appendChild(opt);
+        });
+        // Also add known ones not already found as fallback options
+        data.known.filter(p => !data.paths.includes(p))
+          .forEach(p => piconPathSelect.appendChild(new Option('➕ ' + p, p)));
+      }
+    } catch {
+      piconPathSelect.innerHTML = '<option value="">Fehler beim Laden</option>';
+    }
+  }
+
+  // ─── Picon upload ─────────────────────────────────────────────────────────
+  piconFileInput.addEventListener('change', async () => {
+    const file = piconFileInput.files[0];
+    const sRef = piconUploadSRef;
+    const piconPath = piconPathSelect.value;
+    piconFileInput.value = '';
+    if (!file || !sRef || !piconPath) return;
+
+    setStatus('Picon wird hochgeladen…');
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch('/api/picon/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sRef, piconPath, imageBase64: base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      // Bust the browser cache for this picon and refresh all matching images
+      const cacheBust = `?t=${Date.now()}`;
+      const piconName = sRef.replace(/:+$/, '').replace(/:/g, '_');
+      document.querySelectorAll(`.picon[src*="${encodeURIComponent(sRef)}"], .picon[src*="${piconName}"]`)
+        .forEach(img => {
+          img.style.display = '';
+          img.src = `/picon/${encodeURIComponent(sRef)}${cacheBust}`;
+        });
+
+      setStatus(`Picon gespeichert: ${data.filename}`, 4000);
+    } catch (e) {
+      setStatus(`Picon-Fehler: ${e.message}`);
+    }
+    piconUploadSRef = null;
+  });
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   // ─── Open / Close ─────────────────────────────────────────────────────────
   function open() {
     populateSelects();
+    loadPiconPaths();
     activateTab('edit');
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
@@ -133,15 +207,31 @@
     div.className = 'ed-item' + (item.type === 'marker' ? ' ed-item-marker' : '');
     div.dataset.id = domId;
     const label = item.type === 'marker' ? (item.label || 'Marker') : (item.name || '');
-    const icon  = item.type === 'marker'
-      ? '<span class="ed-marker-icon">📌</span>'
-      : (item.sRef ? (window._app?.piconImg(item.sRef) || '') : '');
+
+    let iconHtml = '';
+    if (item.type === 'marker') {
+      iconHtml = '<span class="ed-marker-icon">📌</span>';
+    } else if (item.sRef) {
+      // Wrap picon in a clickable button for upload
+      const piconHtml = window._app?.piconImg(item.sRef) || `<span class="ed-picon-placeholder"></span>`;
+      iconHtml = `<button class="ed-picon-btn" title="Picon ändern" data-sref="${escHtml(item.sRef)}">${piconHtml}</button>`;
+    }
+
     div.innerHTML = `
       <span class="ed-handle" title="Verschieben">⠿</span>
-      ${icon}
+      ${iconHtml}
       <span class="ed-label">${escHtml(label)}</span>
       <button class="ed-del" title="Entfernen">✕</button>
     `;
+
+    if (item.sRef) {
+      div.querySelector('.ed-picon-btn')?.addEventListener('click', e => {
+        e.stopPropagation();
+        piconUploadSRef = item.sRef;
+        piconFileInput.click();
+      });
+    }
+
     div.querySelector('.ed-del').addEventListener('click', () => {
       currentItems = currentItems.filter(i => i._id !== domId);
       div.remove();

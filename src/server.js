@@ -204,7 +204,6 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
 app.get('/picon/:sref', requireAuth, async (req, res) => {
   try {
     const raw  = decodeURIComponent(req.params.sref);
-    // Normalize: strip trailing colons, replace : with _
     const name = raw.replace(/:+$/, '').replace(/:/g, '_');
     const url  = `${enigmaBase}/picon/${name}.png`;
     const config = { responseType: 'stream', timeout: 5000 };
@@ -215,6 +214,88 @@ app.get('/picon/:sref', requireAuth, async (req, res) => {
     response.data.pipe(res);
   } catch {
     res.status(404).end();
+  }
+});
+
+// ─── Picon management ─────────────────────────────────────────────────────────
+
+// Known picon directories on Enigma2 receivers (checked in order)
+const KNOWN_PICON_DIRS = [
+  '/usr/share/enigma2/picons',
+  '/usr/share/enigma2/picons_hd',
+  '/media/usb/picons',
+  '/media/usb/picons_hd',
+  '/media/hdd/picons',
+  '/media/hdd/picons_hd',
+  '/media/mmc/picons',
+  '/tmp/picons',
+];
+
+// Convert sRef to picon filename: "1:0:1:ABC:1:2:3:0:0:0:" → "1_0_1_ABC_1_2_3_0_0_0"
+function sRefToPiconName(sRef) {
+  return String(sRef).replace(/:+$/, '').replace(/:/g, '_');
+}
+
+// Detect available picon directories via SSH
+app.get('/api/piconpaths', requireAuth, async (req, res) => {
+  const found = [];
+
+  if (ENIGMA2_USER) {
+    let conn;
+    try {
+      conn = await sshConnect();
+      await new Promise((resolve, reject) => {
+        conn.sftp((err, sftp) => {
+          if (err) { conn.end(); return reject(err); }
+          let pending = KNOWN_PICON_DIRS.length;
+          KNOWN_PICON_DIRS.forEach(dir => {
+            sftp.stat(dir, (statErr, attrs) => {
+              if (!statErr && attrs && attrs.isDirectory()) found.push(dir);
+              if (--pending === 0) { conn.end(); resolve(); }
+            });
+          });
+        });
+      });
+    } catch (e) {
+      if (conn) try { conn.end(); } catch {}
+      console.warn('[piconpaths] SSH scan failed:', e.message);
+    }
+  }
+
+  // Also try to read the configured path from Enigma2 settings
+  try {
+    const settings = await enigmaReadFile('/etc/enigma2/settings');
+    const m = settings.match(/config\.DreamPlex\.piconpath\s*=\s*(.+)|config\.plugins\.piconcockpit\.iconpath\s*=\s*(.+)/);
+    if (m) {
+      const p = (m[1] || m[2]).trim();
+      if (p && !found.includes(p)) found.unshift(p);
+    }
+  } catch {}
+
+  res.json({ paths: found, known: KNOWN_PICON_DIRS });
+});
+
+// Upload a picon for a service — body: { sRef, piconPath, imageBase64 }
+app.post('/api/picon/upload', requireAuth, express.json({ limit: '2mb' }), async (req, res) => {
+  const { sRef, piconPath, imageBase64 } = req.body;
+  if (!sRef || !piconPath || !imageBase64)
+    return res.status(400).json({ error: 'Missing fields' });
+  if (!piconPath.startsWith('/'))
+    return res.status(403).json({ error: 'Invalid path' });
+
+  const filename = sRefToPiconName(sRef) + '.png';
+  const remotePath = `${piconPath.replace(/\/$/, '')}/${filename}`;
+
+  try {
+    // Decode base64 (strip data URI prefix if present)
+    const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+
+    await sshWriteFile(remotePath, buf);
+    res.json({ ok: true, remotePath, filename });
+  } catch (e) {
+    console.error('[picon/upload] error:', e.message);
+    res.status(502).json({ error: e.message });
   }
 });
 
@@ -397,7 +478,7 @@ async function sshWriteFile(remotePath, content) {
   return new Promise((resolve, reject) => {
     conn.sftp((err, sftp) => {
       if (err) { conn.end(); return reject(err); }
-      const buf    = Buffer.from(content, 'utf8');
+      const buf    = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
       const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
       stream.on('error', e  => { conn.end(); reject(e); });
       stream.on('close', () => { conn.end(); resolve(); });

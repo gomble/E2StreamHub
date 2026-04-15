@@ -120,6 +120,12 @@
       </div>
       <div class="editor-header-right">
         <span class="editor-status" id="editorStatus"></span>
+        <div class="ed-picon-path-wrap" title="Picon-Ordner auf dem Receiver">
+          <span class="ed-picon-path-label">Picons:</span>
+          <select class="ed-picon-path-select" id="edPiconPathSelect">
+            <option value="">Erkennung…</option>
+          </select>
+        </div>
         <button class="epg-overlay-close" id="editorCloseBtn" title="Close">✕</button>
       </div>
     </div>
@@ -162,6 +168,9 @@
       </div>
 
     </div>
+
+    <!-- Hidden picon file input -->
+    <input type="file" id="edPiconFileInput" accept="image/*" style="display:none">
 
     <!-- Marker dialog -->
     <div class="ed-dialog" id="edMarkerDialog">
