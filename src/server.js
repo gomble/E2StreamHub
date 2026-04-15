@@ -1025,11 +1025,11 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
     '-max_error_rate', '1.0',
     '-probesize', '1000000',
     '-analyzeduration', '1000000',
+    // Large thread queue reduces "no frame!" / "non-existing SPS" stalls
+    // that occur when the demuxer produces frames faster than the decoder.
+    '-thread_queue_size', '512',
     '-i', sourceUrl,
     '-ignore_unknown',
-    // Only map the first video and audio streams — prevents unknown/subtitle/
-    // teletext streams (codec [0x000B], [0x000C], [0x0005]) from causing
-    // "no frame!" / "non-existing SPS" decode errors that stall the muxer.
   ];
 
   if (programNum) {
@@ -1041,24 +1041,16 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
 
   ffArgs.push(
     '-dn', '-sn',
-    '-c:v', 'copy',        // copy video to avoid re-encoding; transcode only if forced
+    '-c:v', 'libx264',
+    '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
+    '-tune', 'zerolatency',
+    '-profile:v', 'high', '-level:v', '4.0',
+    '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
     '-c:a', 'aac', '-ac', '2', '-ar', '48000', '-b:a', '128k',
     '-f', 'mp4',
     '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
     'pipe:1',
   );
-
-  // If video transcode is explicitly forced, replace copy with x264
-  if (FFMPEG_FORCE_VIDEO_TRANSCODE) {
-    const vIdx = ffArgs.indexOf('copy');
-    if (vIdx !== -1) ffArgs.splice(vIdx, 1,
-      'libx264',
-      '-preset', FFMPEG_TRANSCODE_PRESET,
-      '-tune', 'zerolatency',
-      '-profile:v', 'high', '-level:v', '4.0',
-      '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
-    );
-  }
 
   // Retry loop: if the receiver is still closing the previous connection it
   // returns a tiny body immediately (exit 251 / "Stream ends prematurely").
