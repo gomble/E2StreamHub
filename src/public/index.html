@@ -114,13 +114,12 @@
       <div class="editor-header-left">
         <span class="editor-title">Bouquet Editor</span>
         <select class="bouquet-select editor-bq-select" id="editorBouquetSelect">
-          <option value="">Select bouquet…</option>
+          <option value="">Bouquet wählen…</option>
         </select>
-        <button class="btn-secondary" id="editorLoadBtn">Load</button>
+        <button class="btn-secondary" id="editorNewBouquetBtn">+ Neu</button>
       </div>
       <div class="editor-header-right">
         <span class="editor-status" id="editorStatus"></span>
-        <button class="btn-accent" id="editorSaveBtn" disabled>💾 Save</button>
         <button class="epg-overlay-close" id="editorCloseBtn" title="Close">✕</button>
       </div>
     </div>
@@ -162,6 +161,30 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- Marker dialog -->
+    <div class="ed-dialog" id="edMarkerDialog">
+      <div class="ed-dialog-inner">
+        <div class="ed-dialog-title">Marker hinzufügen</div>
+        <input class="ed-dialog-input" id="edMarkerInput" type="text" placeholder="z.B. HD Sender" maxlength="60" />
+        <div class="ed-dialog-actions">
+          <button class="btn-secondary" id="edMarkerCancel">Abbrechen</button>
+          <button class="btn-accent" id="edMarkerConfirm">Hinzufügen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New bouquet dialog -->
+    <div class="ed-dialog" id="edNewBqDialog">
+      <div class="ed-dialog-inner">
+        <div class="ed-dialog-title">Neues Bouquet erstellen</div>
+        <input class="ed-dialog-input" id="edNewBqInput" type="text" placeholder="Bouquet Name" maxlength="60" />
+        <div class="ed-dialog-actions">
+          <button class="btn-secondary" id="edNewBqCancel">Abbrechen</button>
+          <button class="btn-accent" id="edNewBqConfirm">Erstellen</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

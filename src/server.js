@@ -260,70 +260,94 @@ function bouquetFilePath(bRef) {
   return m ? `/etc/enigma2/${m[1]}` : null;
 }
 
+// ─── SSH helpers (SFTP fallback when OpenWebif file API is unavailable) ───────
+
+function sshConnect() {
+  return new Promise((resolve, reject) => {
+    if (!ENIGMA2_USER) {
+      return reject(new Error('SSH nicht konfiguriert: ENIGMA2_USER fehlt'));
+    }
+    const conn = new SshClient();
+    // Hard wall-clock timeout — ssh2's readyTimeout only covers the handshake,
+    // not the TCP SYN phase, so the connection can hang much longer without this.
+    const timer = setTimeout(() => {
+      try { conn.end(); } catch {}
+      reject(new Error(`SSH-Timeout (12 s): ${ENIGMA2_HOST}:${ENIGMA2_SSH_PORT} nicht erreichbar`));
+    }, 12000);
+    conn.on('ready', () => { clearTimeout(timer); resolve(conn); });
+    conn.on('error', err => { clearTimeout(timer); reject(err); });
+    conn.connect({
+      host: ENIGMA2_HOST,
+      port: ENIGMA2_SSH_PORT,
+      username: ENIGMA2_USER,
+      password: ENIGMA2_PASSWORD,
+      readyTimeout: 10000,
+      hostVerifier: () => true,   // local-network receiver, no CA needed
+    });
+  });
+}
+
+async function sshReadFile(remotePath) {
+  const conn = await sshConnect();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      const chunks = [];
+      const stream = sftp.createReadStream(remotePath);
+      stream.on('error', e => { conn.end(); reject(e); });
+      stream.on('data',  c => chunks.push(c));
+      stream.on('end',   () => { conn.end(); resolve(Buffer.concat(chunks).toString('utf8')); });
+    });
+  });
+}
+
+async function sshWriteFile(remotePath, content) {
+  const conn = await sshConnect();
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) { conn.end(); return reject(err); }
+      const buf    = Buffer.from(content, 'utf8');
+      const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
+      stream.on('error', e  => { conn.end(); reject(e); });
+      stream.on('close', () => { conn.end(); resolve(); });
+      stream.end(buf);
+    });
+  });
+}
+
 async function enigmaReadFile(filePath) {
-  const config = {
-    params: { file: filePath },
-    timeout: 15000,
-    responseType: 'text',
-    transformResponse: [d => d],
-  };
-  if (enigmaAuth) config.auth = enigmaAuth;
-  const { data } = await axios.get(`${enigmaBase}/api/file`, config);
-  return data;
+  // Try OpenWebif HTTP file API first
+  try {
+    const config = {
+      params: { file: filePath },
+      timeout: 10000,
+      responseType: 'text',
+      transformResponse: [d => d],
+    };
+    if (enigmaAuth) config.auth = enigmaAuth;
+    const { data } = await axios.get(`${enigmaBase}/api/file`, config);
+    return data;
+  } catch (err) {
+    if (err.response?.status !== 404 && err.response?.status !== 405) throw err;
+  }
+  // SSH fallback
+  return await sshReadFile(filePath);
 }
 
 async function enigmaWriteFile(filePath, content) {
   // Try OpenWebif HTTP file API first
   try {
-    const body = new URLSearchParams({ filename: filePath, file: content }).toString();
-    const config = {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      timeout: 15000,
-    };
+    const body   = new URLSearchParams({ filename: filePath, file: content }).toString();
+    const config = { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 };
     if (enigmaAuth) config.auth = enigmaAuth;
     await axios.post(`${enigmaBase}/api/file`, body, config);
-    return; // success
+    return;
   } catch (err) {
     if (err.response?.status !== 404 && err.response?.status !== 405) throw err;
-    // HTTP file API not available — fall through to SSH
     console.warn('[enigmaWriteFile] HTTP file API unavailable, trying SSH');
   }
-
-  // SSH fallback: write file directly via SFTP
-  if (!ENIGMA2_USER || !ENIGMA2_PASSWORD) {
-    throw new Error('SSH-Schreiben fehlgeschlagen: ENIGMA2_USER / ENIGMA2_PASSWORD nicht konfiguriert');
-  }
-  await sshWriteFile(ENIGMA2_HOST, ENIGMA2_SSH_PORT, ENIGMA2_USER, ENIGMA2_PASSWORD, filePath, content);
-}
-
-function sshWriteFile(host, port, user, password, remotePath, content) {
-  return new Promise((resolve, reject) => {
-    const conn = new SshClient();
-    const buf = Buffer.from(content, 'utf8');
-
-    conn.on('ready', () => {
-      conn.sftp((err, sftp) => {
-        if (err) { conn.end(); return reject(err); }
-
-        const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
-        stream.on('error', e => { conn.end(); reject(e); });
-        stream.on('close', () => { conn.end(); resolve(); });
-        stream.end(buf);
-      });
-    });
-
-    conn.on('error', reject);
-
-    conn.connect({
-      host,
-      port,
-      username: user,
-      password,
-      readyTimeout: 10000,
-      // Accept any host key (receiver is on local network, no CA)
-      hostVerifier: () => true,
-    });
-  });
+  // SSH fallback
+  await sshWriteFile(filePath, content);
 }
 
 function parseBouquetFile(content) {
@@ -384,40 +408,25 @@ app.get('/api/bouquetedit', requireAuth, async (req, res) => {
   const filePath = bouquetFilePath(bRef);
   if (!filePath) return res.status(400).json({ error: 'Invalid bouquet reference' });
 
-  // Try to read the actual bouquet file (preserves markers / order)
+  // Try to read the actual bouquet file (HTTP → SSH → services fallback)
   try {
     const content = await enigmaReadFile(filePath);
-    const parsed = parseBouquetFile(content);
+    const parsed  = parseBouquetFile(content);
     return res.json({ ...parsed, filePath });
-  } catch (err) {
-    const status = err.response?.status;
-    if (status !== 404 && status !== 405) {
-      // Unexpected error — report it
-      console.error('[bouquetedit] read error:', err.message);
-      return res.status(502).json({ error: err.message });
-    }
-    // File API not available on this OpenWebif version — fall back to services list
-    console.warn('[bouquetedit] /api/file not available (HTTP %d), falling back to getservices', status);
+  } catch (readErr) {
+    console.warn('[bouquetedit] file read failed:', readErr.message, '– reconstructing from getservices');
   }
 
-  // Fallback: reconstruct bouquet from the working /api/getservices endpoint.
-  // Markers are not preserved in this path, but channel list and order are.
+  // Last resort: reconstruct from services list (markers not preserved)
   try {
-    const svcData = await enigmaGet('/api/getservices', { sRef: bRef });
+    const svcData  = await enigmaGet('/api/getservices', { sRef: bRef });
     const services = svcData.services || [];
-    // Derive a display name from the file path (e.g. "userbouquet.ciefpskyde.tv" → "ciefpskyde")
-    const name = filePath.split('/').pop()
-      .replace(/^userbouquet\./, '')
-      .replace(/\.[^.]+$/, '');
-    const items = services.map((svc, i) => ({
-      type: 'service',
-      sRef: svc.servicereference,
-      name: svc.servicename,
-      id: `i${i + 1}`,
+    const name     = filePath.split('/').pop().replace(/^userbouquet\./, '').replace(/\.[^.]+$/, '');
+    const items    = services.map((svc, i) => ({
+      type: 'service', sRef: svc.servicereference, name: svc.servicename, id: `i${i + 1}`,
     }));
-    return res.json({ name, items, filePath });
+    return res.json({ name, items, filePath, noFileAccess: true });
   } catch (err2) {
-    console.error('[bouquetedit] fallback getservices error:', err2.message);
     return res.status(502).json({ error: err2.message });
   }
 });
@@ -429,17 +438,40 @@ app.post('/api/bouquetedit', requireAuth, async (req, res) => {
   if (!filePath.startsWith('/etc/enigma2/'))
     return res.status(403).json({ error: 'Invalid path' });
   try {
-    const content = serializeBouquetFile(name, items);
-    await enigmaWriteFile(filePath, content);
+    await enigmaWriteFile(filePath, serializeBouquetFile(name, items));
     enigmaGet('/api/reloadservices').catch(() => {});
     res.json({ ok: true });
   } catch (err) {
-    console.error('[bouquetedit] write error:', err.message, 'status:', err.response?.status);
-    if (err.response?.status === 404 || err.response?.status === 405) {
-      return res.status(502).json({
-        error: 'Speichern nicht möglich: Diese OpenWebif-Version unterstützt keine Datei-API. Bitte OpenWebif aktualisieren.',
-      });
+    console.error('[bouquetedit] write error:', err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.post('/api/createbouquet', requireAuth, async (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Missing bouquet name' });
+
+  const slug     = name.trim().toLowerCase()
+    .replace(/[äöü]/g, c => ({ ä: 'ae', ö: 'oe', ü: 'ue' }[c] || ''))
+    .replace(/ß/g, 'ss').replace(/[^a-z0-9]/g, '').slice(0, 16) || 'bq';
+  const filename = `userbouquet.${slug}${Date.now().toString(36)}.tv`;
+  const filePath = `/etc/enigma2/${filename}`;
+  const bRef     = `1:7:1:0:0:0:0:0:0:0:FROM BOUQUET "${filename}" ORDER BY bouquet`;
+
+  try {
+    await enigmaWriteFile(filePath, `#NAME ${name.trim()}\n`);
+    // Register in bouquets.tv
+    try {
+      let master = await enigmaReadFile('/etc/enigma2/bouquets.tv');
+      master += `#SERVICE ${bRef}\n#DESCRIPTION ${name.trim()}\n`;
+      await enigmaWriteFile('/etc/enigma2/bouquets.tv', master);
+    } catch (e) {
+      console.warn('[createbouquet] bouquets.tv update failed:', e.message);
     }
+    enigmaGet('/api/reloadservices').catch(() => {});
+    res.json({ ok: true, bRef, name: name.trim(), filePath });
+  } catch (err) {
+    console.error('[createbouquet] error:', err.message);
     res.status(502).json({ error: err.message });
   }
 });
