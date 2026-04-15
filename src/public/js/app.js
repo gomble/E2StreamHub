@@ -266,6 +266,10 @@
   }
 
   function piconImg(sRef) {
+    if (!sRef) return '';
+    const firstColon = sRef.indexOf(':');
+    const type = firstColon > -1 ? parseInt(sRef.slice(0, firstColon), 10) : NaN;
+    if (type === 5001 || type === 5002 || sRef.toLowerCase().includes('http')) return '';
     const url = piconUrl(sRef);
     return `<img class="picon" src="${url}" alt="" loading="lazy" onerror="this.style.display='none'">`;
   }

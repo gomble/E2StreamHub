@@ -199,21 +199,53 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 
+// 1×1 transparent PNG — returned instead of 404 so the browser never logs an error
+const TRANSPARENT_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQ' +
+  'AABjkB6QAAAABJRU5ErkJggg==', 'base64');
+
+// In-memory set of sRefs that 404'd on the receiver (reset on server restart)
+const _piconMissing = new Set();
+
 // Proxy picon images from the receiver (avoids CORS + auth issues in browser)
-// The receiver expects the sRef with colons replaced by underscores, no trailing colon.
 app.get('/picon/:sref', requireAuth, async (req, res) => {
+  const sendEmpty = () => {
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.end(TRANSPARENT_PNG);
+  };
+
   try {
-    const raw  = decodeURIComponent(req.params.sref);
-    const name = raw.replace(/:+$/, '').replace(/:/g, '_');
+    const raw = decodeURIComponent(req.params.sref);
+
+    // Skip IPTV streams — receiver has no picons for these
+    const firstType = parseInt(raw.split(':')[0], 10);
+    if (firstType === 5001 || firstType === 5002 || raw.toLowerCase().includes('http')) {
+      return sendEmpty();
+    }
+
+    // Strip embedded label (sRef may have "::Channel Name" appended)
+    const sRefOnly = raw.split('::')[0].replace(/:+$/, '');
+
+    // Skip sRefs we already know are missing
+    if (_piconMissing.has(sRefOnly)) return sendEmpty();
+
+    const name = sRefOnly.replace(/:/g, '_');
     const url  = `${enigmaBase}/picon/${name}.png`;
     const config = { responseType: 'stream', timeout: 5000 };
     if (enigmaAuth) config.auth = enigmaAuth;
+
     const response = await axios.get(url, config);
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=86400');
     response.data.pipe(res);
   } catch {
-    res.status(404).end();
+    // Cache miss so we don't hammer the receiver for the same sRef repeatedly
+    try {
+      const raw = decodeURIComponent(req.params.sref);
+      _piconMissing.add(raw.split('::')[0].replace(/:+$/, ''));
+    } catch { /* ignore */ }
+    sendEmpty();
   }
 });
 
