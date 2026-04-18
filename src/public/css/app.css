@@ -833,14 +833,17 @@ input { font-family: inherit; }
   left: 0;
   display: flex;
   align-items: center;
-  position: sticky;
-  left: 0;
+  gap: 6px;
   z-index: 5;
   cursor: pointer;
+  overflow: hidden;
+  transition: background .15s;
+}
+.epg-channel-label .picon { flex-shrink: 0; }
+.epg-channel-label .epg-ch-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: background .15s;
 }
 
 .epg-channel-label:hover { background: var(--bg4) !important; color: var(--accent); }

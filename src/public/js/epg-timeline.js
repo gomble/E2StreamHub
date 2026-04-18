@@ -161,7 +161,8 @@
 
     guideData.forEach(ch => {
       html += `<div class="epg-channel-row">`;
-      html += `<div class="epg-channel-label" data-sref="${escAttr(ch.sRef)}" data-name="${escAttr(ch.name)}" title="${escAttr(ch.name)}">${window._app.escHtml(ch.name)}</div>`;
+      const piconSrc = `/picon/${encodeURIComponent(ch.sRef)}`;
+      html += `<div class="epg-channel-label" data-sref="${escAttr(ch.sRef)}" data-name="${escAttr(ch.name)}" title="${escAttr(ch.name)}"><img class="picon" src="${piconSrc}" alt="" loading="lazy" onerror="this.style.display='none'"><span class="epg-ch-name">${window._app.escHtml(ch.name)}</span></div>`;
       html += `<div class="epg-programs-track" style="width:${totalPx}px;min-width:${totalPx}px;position:relative">`;
 
       ch.events.forEach(evt => {
