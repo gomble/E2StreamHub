@@ -218,14 +218,17 @@ app.get('/picon/:sref', requireAuth, async (req, res) => {
   try {
     const raw = decodeURIComponent(req.params.sref);
 
-    // Skip IPTV streams — receiver has no picons for these
-    const firstType = parseInt(raw.split(':')[0], 10);
-    if (firstType === 5001 || firstType === 5002 || raw.toLowerCase().includes('http')) {
-      return sendEmpty();
+    // For IPTV sRefs (5001/5002) strip the embedded URL and channel name —
+    // picons are stored using only the first 10 colon-separated fields.
+    const parts = raw.split(':');
+    const firstType = parseInt(parts[0], 10);
+    let sRefOnly;
+    if (firstType === 5001 || firstType === 5002) {
+      sRefOnly = parts.slice(0, 10).join(':');
+    } else {
+      // Strip embedded label (sRef may have "::Channel Name" appended)
+      sRefOnly = raw.split('::')[0].replace(/:+$/, '');
     }
-
-    // Strip embedded label (sRef may have "::Channel Name" appended)
-    const sRefOnly = raw.split('::')[0].replace(/:+$/, '');
 
     // Skip sRefs we already know are missing
     if (_piconMissing.has(sRefOnly)) return sendEmpty();
