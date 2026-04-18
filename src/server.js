@@ -835,10 +835,27 @@ app.get('/hls/:sessionId/:file', requireAuth, (req, res) => {
 
 // ─── Stream proxy ─────────────────────────────────────────────────────────────
 // Strategy:
-//  1. Ask OpenWebif for the stream URL via /web/stream.m3u — this gives the
+//  1. For IPTV sRefs (type 5001/5002), extract the HTTP URL embedded in the sRef
+//     directly — no need to ask the receiver at all.
+//  2. Ask OpenWebif for the stream URL via /web/stream.m3u — this gives the
 //     correct single-program URL (e.g. port 17999) that already has program
 //     selection done server-side. Proxy it directly (no ffmpeg needed).
-//  2. Fall back to ffmpeg extracting the program from the raw MPTS on port 8001.
+//  3. Fall back to ffmpeg extracting the program from the raw MPTS on port 8001.
+
+// Extract the direct stream URL embedded in an IPTV sRef (type 5001/5002).
+// sRef format: "5002:0:1:0:SID:TID:0:0:0:0:http://host/path:Channel Name"
+// Split on ':' gives [..., 'http', '//host/path', 'Channel Name']
+// so the URL is parts[10] + ':' + parts[11].
+function extractIptvUrl(sRef) {
+  const parts = sRef.split(':');
+  const type = parseInt(parts[0], 10);
+  if (type !== 5001 && type !== 5002) return null;
+  if (parts.length > 11 && (parts[10] === 'http' || parts[10] === 'https')) {
+    // parts[11] is "//host/path" — rejoin with the scheme
+    return parts[10] + ':' + parts[11];
+  }
+  return null;
+}
 
 async function resolveSptsUrl(sRef) {
   try {
@@ -849,6 +866,8 @@ async function resolveSptsUrl(sRef) {
     for (const line of m3u.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        // The receiver sometimes appends ":Channel Name" after the URL path.
+        // Use URL() to parse only the valid part, then rebuild cleanly.
         const url = new URL(trimmed);
         // Replace hostname — Docker often can't resolve Fritz.Box mDNS names
         const port = url.port || '80';
@@ -874,7 +893,9 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  const sptsUrl = await resolveSptsUrl(sRef);
+  // For IPTV sRefs the URL is embedded — skip the receiver lookup entirely
+  const iptvUrl = extractIptvUrl(sRef);
+  const sptsUrl = iptvUrl || await resolveSptsUrl(sRef);
 
   let canDirectRelay = false;
   if (sptsUrl) {
@@ -1028,7 +1049,10 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   // Give the receiver time to close its HTTP connection before we reconnect.
   if (killed) await new Promise(r => setTimeout(r, 700));
 
-  const programNum = getProgramNumber(sRef);
+  // For IPTV sRefs the program number from the sRef is the Enigma2 service ID,
+  // not the MPEG-TS program number in the IPTV stream — don't use it.
+  const iptvUrl = extractIptvUrl(sRef);
+  const programNum = iptvUrl ? null : getProgramNumber(sRef);
   console.log(`fMP4 stream: ${sRef}  program=${programNum}`);
 
   res.setHeader('Content-Type', 'video/mp4');
@@ -1037,16 +1061,21 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
 
   let sourceUrl;
   try {
-    // Prefer the single-program URL from OpenWebif if on a dedicated port
-    const sptsUrl = await resolveSptsUrl(sRef);
-    sourceUrl = buildSourceUrl(sRef);
-    if (sptsUrl) {
-      try {
-        const parsed = new URL(sptsUrl);
-        if (parseInt(parsed.port || '80', 10) !== ENIGMA2_STREAM_PORT) {
-          sourceUrl = sptsUrl;
-        }
-      } catch {}
+    if (iptvUrl) {
+      // IPTV channel: URL is embedded in sRef — use it directly, skip receiver lookup
+      sourceUrl = iptvUrl;
+    } else {
+      // Prefer the single-program URL from OpenWebif if on a dedicated port
+      const sptsUrl = await resolveSptsUrl(sRef);
+      sourceUrl = buildSourceUrl(sRef);
+      if (sptsUrl) {
+        try {
+          const parsed = new URL(sptsUrl);
+          if (parseInt(parsed.port || '80', 10) !== ENIGMA2_STREAM_PORT) {
+            sourceUrl = sptsUrl;
+          }
+        } catch {}
+      }
     }
   } catch (err) {
     resolveMySettle();
