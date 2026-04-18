@@ -1042,11 +1042,18 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   if (req.socket.destroyed) { resolveMySettle(); return; }
 
   // Kill every active fMP4 process (there should only ever be one).
+  // Guard against the 'close' event having already fired before we register the
+  // listener — if it has, exitCode/signalCode are non-null and we resolve immediately.
+  // Without this check the settle chain would deadlock and block all future streams.
   let killed = false;
   for (const [key, ff] of [...activeFmp4Streams.entries()]) {
     ff.kill('SIGTERM');
     activeFmp4Streams.delete(key);
-    await new Promise(r => ff.once('close', r));
+    await new Promise(r => {
+      if (ff.exitCode !== null || ff.signalCode !== null) { r(); return; }
+      const guard = setTimeout(r, 3000); // safety net — never block longer than 3 s
+      ff.once('close', () => { clearTimeout(guard); r(); });
+    });
     killed = true;
   }
   // Give the receiver time to close its HTTP connection before we reconnect.
