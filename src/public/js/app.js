@@ -809,6 +809,99 @@
     videoOverlay.querySelector('.overlay-text').textContent = 'Select a channel';
   }
 
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  // M=Mute  ↑↓=Channel up/down  ←→=Volume  PgUp/PgDn=Bouquet up/down
+  function getChannelItems() {
+    return [...channelList.querySelectorAll('.channel-item')];
+  }
+
+  function showOsd(text) {
+    let osd = document.getElementById('kbOsd');
+    if (!osd) {
+      osd = document.createElement('div');
+      osd.id = 'kbOsd';
+      osd.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+        'background:rgba(0,0,0,.75);color:#fff;padding:8px 20px;border-radius:8px;' +
+        'font-size:14px;font-weight:600;pointer-events:none;z-index:9999;transition:opacity .3s';
+      document.body.appendChild(osd);
+    }
+    osd.textContent = text;
+    osd.style.opacity = '1';
+    clearTimeout(osd._t);
+    osd._t = setTimeout(() => { osd.style.opacity = '0'; }, 1500);
+  }
+
+  document.addEventListener('keydown', e => {
+    // Skip when typing in an input/textarea/select
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // Skip when a modal/overlay is open
+    if (eventModal.classList.contains('open')) return;
+    if (epgOverlay.classList.contains('open')) return;
+
+    switch (e.key) {
+      case 'm':
+      case 'M': {
+        e.preventDefault();
+        videoEl.muted = !videoEl.muted;
+        showOsd(videoEl.muted ? '🔇 Mute' : '🔊 Unmute');
+        break;
+      }
+      case 'ArrowLeft': {
+        e.preventDefault();
+        videoEl.volume = Math.max(0, +(videoEl.volume - 0.1).toFixed(1));
+        showOsd(`Lautstärke: ${Math.round(videoEl.volume * 100)}%`);
+        break;
+      }
+      case 'ArrowRight': {
+        e.preventDefault();
+        videoEl.volume = Math.min(1, +(videoEl.volume + 0.1).toFixed(1));
+        showOsd(`Lautstärke: ${Math.round(videoEl.volume * 100)}%`);
+        break;
+      }
+      case 'ArrowDown': {
+        e.preventDefault();
+        const items = getChannelItems();
+        if (!items.length) break;
+        const idx = items.findIndex(el => el.dataset.sref === currentSRef);
+        const next = items[idx + 1] || items[0];
+        next.click();
+        next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        const items = getChannelItems();
+        if (!items.length) break;
+        const idx = items.findIndex(el => el.dataset.sref === currentSRef);
+        const prev = idx <= 0 ? items[items.length - 1] : items[idx - 1];
+        prev.click();
+        prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        break;
+      }
+      case 'PageDown': {
+        e.preventDefault();
+        const opts = [...bouquetSelect.options];
+        const cur = bouquetSelect.selectedIndex;
+        const next = cur < opts.length - 1 ? cur + 1 : 0;
+        bouquetSelect.selectedIndex = next;
+        bouquetSelect.dispatchEvent(new Event('change'));
+        showOsd(`Bouquet: ${opts[next].text}`);
+        break;
+      }
+      case 'PageUp': {
+        e.preventDefault();
+        const opts = [...bouquetSelect.options];
+        const cur = bouquetSelect.selectedIndex;
+        const prev = cur > 0 ? cur - 1 : opts.length - 1;
+        bouquetSelect.selectedIndex = prev;
+        bouquetSelect.dispatchEvent(new Event('change'));
+        showOsd(`Bouquet: ${opts[prev].text}`);
+        break;
+      }
+    }
+  });
+
   // ─── Cleanup on page close ────────────────────────────────────────────────
   window.addEventListener('beforeunload', () => {
     if (fmp4Abort) fmp4Abort.abort();
