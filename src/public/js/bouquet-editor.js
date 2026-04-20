@@ -94,12 +94,14 @@
     activateTab('edit');
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
+    if (window._app?.updatePip) window._app.updatePip();
   }
 
   function close() {
     if (editorDirty && !confirm('Ungespeicherte Änderungen verwerfen?')) return;
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
+    if (window._app?.updatePip) window._app.updatePip();
   }
 
   closeBtn.addEventListener('click', close);

@@ -870,6 +870,87 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
   }
 });
 
+// ─── Receiver Settings / Control ────────────────────────────────────────────
+
+app.get('/api/about', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/about');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/signal', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/signal');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/vol', requireAuth, async (req, res) => {
+  try {
+    const params = {};
+    if (req.query.set !== undefined) params.set = req.query.set;
+    const data = await enigmaGet('/api/vol', params);
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/powerstate', requireAuth, async (req, res) => {
+  try {
+    const params = {};
+    if (req.query.newstate !== undefined) params.newstate = req.query.newstate;
+    const data = await enigmaGet('/api/powerstate', params);
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/message', requireAuth, async (req, res) => {
+  try {
+    const { text, type, timeout } = req.query;
+    const data = await enigmaGet('/api/message', { text, type: type || '1', timeout: timeout || '10' });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/timerlist', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/timerlist');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/deviceinfo', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/deviceinfo');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/remotecontrol', requireAuth, async (req, res) => {
+  try {
+    const { command } = req.query;
+    if (!command) return res.status(400).json({ error: 'Missing command' });
+    const data = await enigmaGet('/api/remotecontrol', { command });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.post('/hls/start', requireAuth, async (req, res) => {
   try {
     const sRef = String(req.body?.sRef || '');

@@ -18,6 +18,7 @@
     <button class="nav-btn active" data-view="player">Player</button>
     <button class="nav-btn" data-view="epg">EPG Guide</button>
     <button class="nav-btn" data-view="editor">Bouquet Editor</button>
+    <button class="nav-btn" data-view="receiver">Receiver</button>
   </nav>
   <div class="topbar-right">
     <button class="nav-btn" id="logToggleBtn" title="Server Log">Log</button>
@@ -42,7 +43,7 @@
   </aside>
 
   <main class="main-content">
-    <div class="log-panel" id="logPanel" style="display:none">
+        <div class="log-panel" id="logPanel" style="display:none">
       <div class="log-header">
         <span class="log-title">Server Log</span>
         <div class="log-actions">
@@ -53,33 +54,32 @@
       <div class="log-body" id="logBody"></div>
     </div>
     <div class="main-inner">
-      <div class="player-area">
-        <div class="video-wrapper">
-          <video id="videoPlayer" controls playsinline></video>
-          <div class="video-overlay" id="videoOverlay">
-            <div class="overlay-icon">▶</div>
-            <div class="overlay-text">Select a channel</div>
-          </div>
-          <div class="buffering-spinner" id="bufferingSpinner"></div>
+    <div class="player-area">
+      <div class="video-wrapper">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="video-overlay" id="videoOverlay">
+          <div class="overlay-icon">▶</div>
+          <div class="overlay-text">Select a channel</div>
         </div>
+        <div class="buffering-spinner" id="bufferingSpinner"></div>
+      </div>
 
-        <div class="now-playing" id="nowPlaying" style="display:none">
-          <div class="now-playing-channel" id="npChannel"></div>
-          <div class="now-playing-info">
-            <div class="now-playing-title" id="npTitle"></div>
-            <div class="now-playing-time" id="npTime"></div>
-            <div class="now-playing-progress">
-              <div class="progress-bar" id="npProgress"></div>
-            </div>
+      <div class="now-playing" id="nowPlaying" style="display:none">
+        <div class="now-playing-channel" id="npChannel"></div>
+        <div class="now-playing-info">
+          <div class="now-playing-title" id="npTitle"></div>
+          <div class="now-playing-time" id="npTime"></div>
+          <div class="now-playing-progress">
+            <div class="progress-bar" id="npProgress"></div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="epg-panel" id="epgPanel">
-        <div class="epg-panel-header">Programme Info</div>
-        <div class="epg-panel-content" id="epgContent">
-          <div class="epg-empty">No channel selected</div>
-        </div>
+    <div class="epg-panel" id="epgPanel">
+      <div class="epg-panel-header">Programme Info</div>
+      <div class="epg-panel-content" id="epgContent">
+        <div class="epg-empty">No channel selected</div>
       </div>
     </div>
   </main>
@@ -95,8 +95,8 @@
         </select>
         <button class="btn-secondary" id="epgLoadBtn">Load EPG</button>
         <select class="epg-zoom-select" id="epgZoomSelect" title="Sichtbarer Zeitbereich">
-          <option value="2">2 Std.</option>
-          <option value="3" selected>3 Std.</option>
+          <option value="2" selected>2 Std.</option>
+          <option value="3">3 Std.</option>
           <option value="6">6 Std.</option>
           <option value="12">12 Std.</option>
           <option value="24">24 Std.</option>
@@ -225,6 +225,98 @@
   </div>
 </div>
 
+<!-- ─── Receiver Settings Overlay ─────────────────────────────────────────── -->
+<div class="receiver-overlay" id="receiverOverlay" aria-hidden="true">
+  <div class="receiver-panel">
+    <div class="receiver-header">
+      <span class="receiver-title">Receiver Settings</span>
+      <button class="epg-overlay-close" id="receiverCloseBtn" title="Close">✕</button>
+    </div>
+    <div class="receiver-body">
+
+      <!-- Device Info -->
+      <section class="rcv-section" id="rcvInfoSection">
+        <h3 class="rcv-section-title">Receiver Info</h3>
+        <div class="rcv-info-grid" id="rcvInfoGrid">
+          <div class="rcv-info-item"><span class="rcv-label">Model</span><span class="rcv-value" id="rcvModel">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Image</span><span class="rcv-value" id="rcvImage">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Enigma2</span><span class="rcv-value" id="rcvEnigmaVer">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">OpenWebif</span><span class="rcv-value" id="rcvWebifVer">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Uptime</span><span class="rcv-value" id="rcvUptime">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Tuner</span><span class="rcv-value" id="rcvTuners">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">HDD</span><span class="rcv-value" id="rcvHdd">–</span></div>
+        </div>
+      </section>
+
+      <!-- Signal -->
+      <section class="rcv-section" id="rcvSignalSection">
+        <h3 class="rcv-section-title">Signal</h3>
+        <div class="rcv-signal-bars">
+          <div class="rcv-signal-row"><span class="rcv-label">SNR</span><div class="rcv-bar-track"><div class="rcv-bar-fill" id="rcvSnrBar"></div></div><span class="rcv-signal-val" id="rcvSnrVal">–</span></div>
+          <div class="rcv-signal-row"><span class="rcv-label">AGC</span><div class="rcv-bar-track"><div class="rcv-bar-fill" id="rcvAgcBar"></div></div><span class="rcv-signal-val" id="rcvAgcVal">–</span></div>
+          <div class="rcv-signal-row"><span class="rcv-label">BER</span><span class="rcv-signal-val" id="rcvBerVal">–</span></div>
+        </div>
+      </section>
+
+      <!-- Power Controls -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Power</h3>
+        <div class="rcv-btn-row">
+          <button class="btn-secondary rcv-btn" data-power="0" title="Toggle Standby">Standby</button>
+          <button class="btn-secondary rcv-btn" data-power="2" title="Reboot receiver">Neustart</button>
+          <button class="btn-secondary rcv-btn rcv-btn-danger" data-power="1" title="Deep Standby">Deep Standby</button>
+          <button class="btn-secondary rcv-btn rcv-btn-danger" data-power="3" title="Restart Enigma2 GUI">GUI Neustart</button>
+        </div>
+      </section>
+
+      <!-- Volume -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Lautstärke</h3>
+        <div class="rcv-volume-row">
+          <button class="btn-icon rcv-vol-btn" id="rcvVolDown">−</button>
+          <div class="rcv-vol-track">
+            <div class="rcv-vol-fill" id="rcvVolFill"></div>
+          </div>
+          <span class="rcv-vol-val" id="rcvVolVal">–</span>
+          <button class="btn-icon rcv-vol-btn" id="rcvVolUp">+</button>
+          <button class="btn-icon rcv-vol-btn" id="rcvMuteBtn" title="Mute">🔊</button>
+        </div>
+      </section>
+
+      <!-- Send Message -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Nachricht senden</h3>
+        <div class="rcv-msg-row">
+          <input class="channel-search rcv-msg-input" id="rcvMsgInput" type="text" placeholder="Nachricht an den Receiver…" maxlength="200" />
+          <select class="bouquet-select rcv-msg-type" id="rcvMsgType" style="width:auto">
+            <option value="1">Ja/Nein</option>
+            <option value="2">Info</option>
+            <option value="3">Nachricht</option>
+            <option value="0">Warnung</option>
+          </select>
+          <button class="btn-secondary" id="rcvMsgSend">Senden</button>
+        </div>
+      </section>
+
+      <!-- Timer List -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Timer</h3>
+        <div class="rcv-timer-list" id="rcvTimerList">
+          <div class="list-placeholder">Lade Timer…</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ─── PiP Window ───────────────────────────────────────────────────────── -->
+<div class="pip-window" id="pipWindow">
+  <span class="pip-channel-badge" id="pipChannel"></span>
+  <button class="pip-close" id="pipClose" title="Close PiP">✕</button>
+  <div class="pip-resize"></div>
+</div>
+
 <!-- Scripts -->
 <script src="/js/mpegts.js"></script>
 <script src="/js/hls.min.js"></script>
@@ -232,5 +324,6 @@
 <script src="/js/app.js"></script>
 <script src="/js/epg-timeline.js"></script>
 <script src="/js/bouquet-editor.js"></script>
+<script src="/js/receiver-settings.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 (function () {
   // Zoom = how many hours fit in the visible container width.
   // PX_PER_MIN is derived at render time from the container width and zoom level.
-  let hoursVisible = 3;            // controlled by #epgZoomSelect
+  let hoursVisible = 2;            // controlled by #epgZoomSelect
   let guideData    = [];           // [{ name, sRef, events: [{...}] }]
   let rangeStartTs = 0;            // unix ts of the leftmost rendered column
   let rangeTotalMin = 0;           // total minutes rendered
@@ -42,6 +42,17 @@
     if (container) container.scrollLeft += container.clientWidth * 0.8;
   });
   epgNowBtn.addEventListener('click', scrollToNow);
+
+  // ─── Auto-load when overlay opens ─────────────────────────────────────────
+  const epgOverlayEl = document.getElementById('epgOverlay');
+  const observer = new MutationObserver(() => {
+    if (!epgOverlayEl.classList.contains('open')) return;
+    const bRef = epgBouquetSelect.value;
+    if (bRef && guideData.length === 0) {
+      loadAndRender(bRef);
+    }
+  });
+  observer.observe(epgOverlayEl, { attributes: true, attributeFilter: ['class'] });
 
   // ─── Load EPG ─────────────────────────────────────────────────────────────
   // /api/epgbouquet only returns the CURRENT event — useless for a full timeline.

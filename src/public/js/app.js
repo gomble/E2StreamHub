@@ -138,16 +138,91 @@
 
   // ─── Navigation ───────────────────────────────────────────────────────────
   const epgOverlay = document.getElementById('epgOverlay');
+  const editorOverlay = document.getElementById('editorOverlay');
+  const receiverOverlay = document.getElementById('receiverOverlay');
+
+  // ─── Picture-in-Picture ────────────────────────────────────────────────────
+  const pipWindow       = document.getElementById('pipWindow');
+  const pipChannelBadge = document.getElementById('pipChannel');
+  const pipClose        = document.getElementById('pipClose');
+  const videoWrapper    = document.querySelector('.video-wrapper');
+
+  function showPip() {
+    if (!currentSRef) return;
+    pipChannelBadge.textContent = currentChannelName || '';
+    videoEl.controls = false;
+    pipWindow.appendChild(videoEl);
+    pipWindow.classList.add('active');
+  }
+
+  function hidePip() {
+    if (!pipWindow.classList.contains('active')) return;
+    videoWrapper.insertBefore(videoEl, videoWrapper.querySelector('.video-overlay'));
+    videoEl.controls = true;
+    pipWindow.classList.remove('active');
+  }
+
+  function updatePip() {
+    const anyOpen = epgOverlay.classList.contains('open')
+                 || editorOverlay.classList.contains('open')
+                 || receiverOverlay.classList.contains('open');
+    if (anyOpen && currentSRef) showPip();
+    else hidePip();
+  }
+
+  pipClose.addEventListener('click', () => {
+    hidePip();
+    pipWindow.classList.remove('active');
+  });
+
+  // Drag PiP window
+  (function initPipDrag() {
+    let dragging = false, ox = 0, oy = 0;
+    pipWindow.addEventListener('mousedown', e => {
+      if (e.target.closest('.pip-close') || e.target.closest('.pip-resize')) return;
+      dragging = true;
+      ox = e.clientX - pipWindow.offsetLeft;
+      oy = e.clientY - pipWindow.offsetTop;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      pipWindow.style.left = `${e.clientX - ox}px`;
+      pipWindow.style.top  = `${e.clientY - oy}px`;
+      pipWindow.style.right = 'auto';
+      pipWindow.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', () => { dragging = false; });
+
+    // Resize from bottom-left corner
+    const resizeHandle = pipWindow.querySelector('.pip-resize');
+    let resizing = false, startW = 0, startX = 0;
+    resizeHandle.addEventListener('mousedown', e => {
+      resizing = true;
+      startW = pipWindow.offsetWidth;
+      startX = e.clientX;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!resizing) return;
+      const newW = Math.max(200, Math.min(640, startW - (e.clientX - startX)));
+      pipWindow.style.width = `${newW}px`;
+    });
+    document.addEventListener('mouseup', () => { resizing = false; });
+  })();
 
   function openEpgOverlay() {
     syncEpgBouquetSelect();
     epgOverlay.classList.add('open');
     epgOverlay.setAttribute('aria-hidden', 'false');
+    updatePip();
   }
 
   function closeEpgOverlay() {
     epgOverlay.classList.remove('open');
     epgOverlay.setAttribute('aria-hidden', 'true');
+    updatePip();
   }
 
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -156,6 +231,8 @@
         openEpgOverlay();
       } else if (btn.dataset.view === 'editor') {
         if (window._editorOpen) window._editorOpen();
+      } else if (btn.dataset.view === 'receiver') {
+        if (window._receiverOpen) window._receiverOpen();
       }
     });
   });
@@ -195,13 +272,19 @@
         bouquetSelect.appendChild(opt);
       });
 
-      // Restore last used bouquet
+      // Restore last used bouquet, or auto-select the first one
       const lastBouquet = localStorage.getItem('lastBouquet');
+      let activeBouquet = null;
       if (lastBouquet && allBouquets.some(b => b.ref === lastBouquet)) {
-        bouquetSelect.value = lastBouquet;
-        await loadChannels(lastBouquet);
-        // After channels load, preload EPG in background
-        scheduleEpgPreload(lastBouquet);
+        activeBouquet = lastBouquet;
+      } else if (allBouquets.length > 0) {
+        activeBouquet = allBouquets[0].ref;
+      }
+      if (activeBouquet) {
+        bouquetSelect.value = activeBouquet;
+        localStorage.setItem('lastBouquet', activeBouquet);
+        await loadChannels(activeBouquet);
+        scheduleEpgPreload(activeBouquet);
       }
     } catch (e) {
       bouquetSelect.innerHTML = '<option value="">Failed to load</option>';
@@ -215,8 +298,8 @@
 
   function scheduleEpgPreload(bouquetRef) {
     clearTimeout(epgPreloadTimer);
-    // Wait 8s after channel load before hitting the receiver with EPG requests
-    epgPreloadTimer = setTimeout(() => preloadEpgForBouquet(bouquetRef), 8000);
+    // Start EPG preload after a short delay to let the UI settle
+    epgPreloadTimer = setTimeout(() => preloadEpgForBouquet(bouquetRef), 2000);
   }
 
   async function preloadEpgForBouquet(bouquetRef) {
@@ -672,6 +755,8 @@
     // Schedule background EPG preload for the active bouquet
     const activeBouquet = bouquetSelect.value;
     if (activeBouquet) scheduleEpgPreload(activeBouquet);
+
+    updatePip();
   }
 
   // ─── EPG Side Panel ───────────────────────────────────────────────────────
@@ -979,5 +1064,6 @@
     piconImg,
     get allBouquets() { return allBouquets; },
     channelCache,
+    updatePip,
   };
 })();
