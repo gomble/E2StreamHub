@@ -914,6 +914,55 @@
     }
   });
 
+  // ─── Log Panel ────────────────────────────────────────────────────────────
+  const logPanel   = document.getElementById('logPanel');
+  const logBody    = document.getElementById('logBody');
+  const logToggle  = document.getElementById('logToggleBtn');
+  const logCloseBtn = document.getElementById('logCloseBtn');
+  const logClearBtn = document.getElementById('logClearBtn');
+  let logSource = null;
+  const MAX_LOG_LINES = 500;
+
+  function connectLog() {
+    if (logSource) return;
+    logSource = new EventSource('/api/logs');
+    logSource.onmessage = (e) => {
+      try {
+        const { ts, level, msg } = JSON.parse(e.data);
+        const line = document.createElement('div');
+        line.className = `log-line log-${level}`;
+        const time = ts.slice(11, 19);
+        line.innerHTML = `<span class="log-ts">${time}</span>${escHtml(msg)}`;
+        logBody.appendChild(line);
+        while (logBody.children.length > MAX_LOG_LINES) logBody.removeChild(logBody.firstChild);
+        logBody.scrollTop = logBody.scrollHeight;
+      } catch {}
+    };
+    logSource.onerror = () => {
+      logSource.close();
+      logSource = null;
+      setTimeout(connectLog, 3000);
+    };
+  }
+
+  function openLogPanel() {
+    logPanel.style.display = 'flex';
+    logToggle.classList.add('active');
+    connectLog();
+  }
+
+  function closeLogPanel() {
+    logPanel.style.display = 'none';
+    logToggle.classList.remove('active');
+    if (logSource) { logSource.close(); logSource = null; }
+  }
+
+  logToggle.addEventListener('click', () => {
+    logPanel.style.display === 'none' ? openLogPanel() : closeLogPanel();
+  });
+  logCloseBtn.addEventListener('click', closeLogPanel);
+  logClearBtn.addEventListener('click', () => { logBody.innerHTML = ''; });
+
   // ─── Boot ─────────────────────────────────────────────────────────────────
   loadBouquets();
 

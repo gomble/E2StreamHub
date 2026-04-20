@@ -11,6 +11,26 @@ const { Client: SshClient } = require('ssh2');
 const app = express();
 const PORT = process.env.PORT || 2000;
 
+// ─── Live log streaming via SSE ──────────────────────────────────────────────
+const logClients = new Set();
+
+function broadcastLog(level, args) {
+  const ts = new Date().toISOString();
+  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  const payload = JSON.stringify({ ts, level, msg });
+  for (const res of logClients) {
+    res.write(`data: ${payload}\n\n`);
+  }
+}
+
+const _origLog = console.log.bind(console);
+const _origWarn = console.warn.bind(console);
+const _origError = console.error.bind(console);
+
+console.log   = (...args) => { _origLog(...args);   broadcastLog('info',  args); };
+console.warn  = (...args) => { _origWarn(...args);   broadcastLog('warn',  args); };
+console.error = (...args) => { _origError(...args);  broadcastLog('error', args); };
+
 const ENIGMA2_HOST = process.env.ENIGMA2_HOST || '192.168.1.100';
 const ENIGMA2_PORT = parseInt(process.env.ENIGMA2_PORT || '80', 10);
 const ENIGMA2_STREAM_PORT = parseInt(process.env.ENIGMA2_STREAM_PORT || '8001', 10);
@@ -1190,6 +1210,16 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   }
 
   if (!res.writableEnded) res.end();
+});
+
+// ─── Live log SSE endpoint ───────────────────────────────────────────────────
+app.get('/api/logs', requireAuth, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  logClients.add(res);
+  req.on('close', () => logClients.delete(res));
 });
 
 // ─── Static files & SPA fallback ─────────────────────────────────────────────

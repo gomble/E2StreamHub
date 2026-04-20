@@ -20,6 +20,7 @@
     <button class="nav-btn" data-view="editor">Bouquet Editor</button>
   </nav>
   <div class="topbar-right">
+    <button class="nav-btn" id="logToggleBtn" title="Server Log">Log</button>
     <span class="status-dot" id="statusDot" title="Receiver Status"></span>
     <span class="current-time" id="currentTime"></span>
     <button class="logout-btn" id="logoutBtn">Sign out</button>
@@ -41,32 +42,44 @@
   </aside>
 
   <main class="main-content">
-    <div class="player-area">
-      <div class="video-wrapper">
-        <video id="videoPlayer" controls playsinline></video>
-        <div class="video-overlay" id="videoOverlay">
-          <div class="overlay-icon">▶</div>
-          <div class="overlay-text">Select a channel</div>
+    <div class="log-panel" id="logPanel" style="display:none">
+      <div class="log-header">
+        <span class="log-title">Server Log</span>
+        <div class="log-actions">
+          <button class="btn-icon log-clear-btn" id="logClearBtn" title="Clear">🗑</button>
+          <button class="btn-icon log-close-btn" id="logCloseBtn" title="Close">✕</button>
         </div>
-        <div class="buffering-spinner" id="bufferingSpinner"></div>
       </div>
+      <div class="log-body" id="logBody"></div>
+    </div>
+    <div class="main-inner">
+      <div class="player-area">
+        <div class="video-wrapper">
+          <video id="videoPlayer" controls playsinline></video>
+          <div class="video-overlay" id="videoOverlay">
+            <div class="overlay-icon">▶</div>
+            <div class="overlay-text">Select a channel</div>
+          </div>
+          <div class="buffering-spinner" id="bufferingSpinner"></div>
+        </div>
 
-      <div class="now-playing" id="nowPlaying" style="display:none">
-        <div class="now-playing-channel" id="npChannel"></div>
-        <div class="now-playing-info">
-          <div class="now-playing-title" id="npTitle"></div>
-          <div class="now-playing-time" id="npTime"></div>
-          <div class="now-playing-progress">
-            <div class="progress-bar" id="npProgress"></div>
+        <div class="now-playing" id="nowPlaying" style="display:none">
+          <div class="now-playing-channel" id="npChannel"></div>
+          <div class="now-playing-info">
+            <div class="now-playing-title" id="npTitle"></div>
+            <div class="now-playing-time" id="npTime"></div>
+            <div class="now-playing-progress">
+              <div class="progress-bar" id="npProgress"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="epg-panel" id="epgPanel">
-      <div class="epg-panel-header">Programme Info</div>
-      <div class="epg-panel-content" id="epgContent">
-        <div class="epg-empty">No channel selected</div>
+      <div class="epg-panel" id="epgPanel">
+        <div class="epg-panel-header">Programme Info</div>
+        <div class="epg-panel-content" id="epgContent">
+          <div class="epg-empty">No channel selected</div>
+        </div>
       </div>
     </div>
   </main>
