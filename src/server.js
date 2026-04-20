@@ -1467,11 +1467,15 @@ app.get('/hls/:sessionId/:file', requireAuth, (req, res) => {
 // so the URL is parts[10] + ':' + parts[11].
 // The scheme may also be percent-encoded as 'http%3a' or 'https%3a'.
 function extractIptvUrl(sRef) {
-  const parts = sRef.split(':');
+  // Fully decode the sRef first — it may arrive double-encoded (e.g. http%3a → http:)
+  let decoded;
+  try { decoded = decodeURIComponent(sRef); } catch { decoded = sRef; }
+  const parts = decoded.split(':');
   const type = parseInt(parts[0], 10);
   if (type !== 5001 && type !== 5002) return null;
+  // parts[10] = 'http' or 'https', parts[11] = '//host/path'
   if (parts.length > 11) {
-    const scheme = decodeURIComponent(parts[10]).toLowerCase();
+    const scheme = parts[10].toLowerCase().replace(/%3a$/, '');
     if (scheme === 'http' || scheme === 'https') {
       return scheme + ':' + parts[11];
     }
