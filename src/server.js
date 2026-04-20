@@ -188,7 +188,7 @@ try {
   fs.mkdirSync(hlsRootDir, { recursive: true });
 } catch {}
 
-app.use(compression());
+app.use(compression({ filter: (req, res) => req.path !== '/api/logs' && compression.filter(req, res) }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
