@@ -527,7 +527,11 @@
         const current = events.find(e => e.begin_timestamp <= now && (e.begin_timestamp + e.duration_sec) > now);
         if (current) {
           const el = document.getElementById(`cnow-${sanitizeId(svc.servicereference)}`);
-          if (el) el.textContent = decodeHtml(current.title || '');
+          if (el) {
+            const title = decodeHtml(current.title || '');
+            el.textContent = title;
+            el.title = title;
+          }
         }
       } catch { /* skip */ }
       await sleep(50);
