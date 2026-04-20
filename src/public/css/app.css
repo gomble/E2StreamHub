@@ -568,6 +568,51 @@ input { font-family: inherit; }
   transition: width 30s linear;
 }
 
+/* ─── Recording seek bar ─────────────────────────────────────────────────── */
+.rec-seek-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rec-seek-time {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 36px;
+}
+.rec-seek-time:last-child { text-align: right; }
+.rec-seek-track {
+  flex: 1;
+  height: 4px;
+  background: var(--bg4);
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+}
+.rec-seek-track:hover { height: 6px; margin-top: -1px; }
+.rec-seek-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  width: 0;
+}
+.rec-seek-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  left: 0;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.rec-seek-track:hover .rec-seek-thumb { opacity: 1; }
+
 /* ─── EPG Side Panel ───────────────────────────────────────────────────────── */
 .epg-panel {
   width: 320px;

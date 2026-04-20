@@ -736,6 +736,7 @@
 
     videoOverlay.classList.add('hidden');
     bufferingSpinner.classList.add('visible');
+    hideRecSeekBar();
 
     await stopCurrentPlayback();
 
@@ -1144,6 +1145,102 @@
     renderRecordings(filtered);
   });
 
+  // ─── Recording seek state ─────────────────────────────────────────────────
+  let recDuration = 0;       // total seconds of current recording
+  let recStartOffset = 0;    // seconds offset at which current stream started
+  let recSeekTimer = null;   // interval to update seek bar
+  let currentRecFile = null; // file path of current recording
+
+  function fmtSecs(s) {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function updateRecSeekBar() {
+    if (!recDuration) return;
+    const elapsed = recStartOffset + (videoEl.currentTime || 0);
+    const pct = Math.min(100, (elapsed / recDuration) * 100);
+    document.getElementById('recSeekFill').style.width = `${pct}%`;
+    document.getElementById('recSeekThumb').style.left = `${pct}%`;
+    document.getElementById('recSeekCurrent').textContent = fmtSecs(elapsed);
+  }
+
+  function hideRecSeekBar() {
+    clearInterval(recSeekTimer);
+    recSeekTimer = null;
+    document.getElementById('recSeekBar').style.display = 'none';
+    recDuration = 0;
+    recStartOffset = 0;
+    currentRecFile = null;
+  }
+
+  async function startRecordingStream(filePath, startSec) {
+    bufferingSpinner.classList.add('visible');
+    await stopCurrentPlayback();
+
+    videoEl.onwaiting = () => bufferingSpinner.classList.add('visible');
+    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
+    videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
+
+    if (!fmp4Supported()) {
+      showVideoError('Recordings require MSE support (Chrome/Firefox/Edge).');
+      return;
+    }
+
+    fmp4Abort = new AbortController();
+    const ms = new MediaSource();
+    videoEl.src = URL.createObjectURL(ms);
+    await new Promise((resolve, reject) => {
+      ms.addEventListener('sourceopen', resolve, { once: true });
+      ms.addEventListener('error', () => reject(new Error('MediaSource error')), { once: true });
+    });
+    let sb;
+    try {
+      sb = ms.addSourceBuffer(FMP4_MIME);
+    } catch (e) {
+      console.warn('Recording SourceBuffer failed:', e.message);
+      return;
+    }
+    const waitSb = () => sb.updating
+      ? new Promise(r => sb.addEventListener('updateend', r, { once: true }))
+      : Promise.resolve();
+
+    recStartOffset = startSec;
+    let playStarted = false;
+    (async () => {
+      try {
+        const url = `/stream-recording?file=${encodeURIComponent(filePath)}${startSec > 0 ? `&start=${startSec}` : ''}`;
+        const resp = await fetch(url, { signal: fmp4Abort.signal });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const reader = resp.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          await waitSb();
+          if (sb.buffered.length > 0 && videoEl.currentTime > 20) {
+            const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 10);
+            if (trimTo > sb.buffered.start(0) + 1) {
+              sb.remove(sb.buffered.start(0), trimTo);
+              await waitSb();
+            }
+          }
+          try { sb.appendBuffer(value instanceof Uint8Array ? value.buffer : value); } catch {}
+          if (!playStarted && sb.buffered.length > 0) {
+            playStarted = true;
+            videoEl.play().catch(() => {});
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Recording stream error:', err.message);
+      }
+    })();
+  }
+
   async function playRecording(movie) {
     const filePath = movie.filename || '';
     const name = movie.eventname || movie.filename || '–';
@@ -1158,77 +1255,20 @@
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     currentSRef = filePath;
     currentChannelName = name;
+    currentRecFile = filePath;
 
     videoOverlay.classList.add('hidden');
-    bufferingSpinner.classList.add('visible');
-    await stopCurrentPlayback();
+    hideRecSeekBar();
 
-    videoEl.onwaiting = () => bufferingSpinner.classList.add('visible');
-    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
-    videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
-
-    // Use dedicated recording stream endpoint with file path
-    if (fmp4Supported()) {
-      fmp4Abort = new AbortController();
-      const ms = new MediaSource();
-      videoEl.src = URL.createObjectURL(ms);
-      await new Promise((resolve, reject) => {
-        ms.addEventListener('sourceopen', resolve, { once: true });
-        ms.addEventListener('error', () => reject(new Error('MediaSource error')), { once: true });
-      });
-      let sb;
-      try {
-        sb = ms.addSourceBuffer(FMP4_MIME);
-      } catch (e) {
-        console.warn('Recording SourceBuffer failed:', e.message);
-        return;
-      }
-      const waitSb = () => sb.updating
-        ? new Promise(r => sb.addEventListener('updateend', r, { once: true }))
-        : Promise.resolve();
-
-      let playStarted = false;
-      (async () => {
-        try {
-          const resp = await fetch(`/stream-recording?file=${encodeURIComponent(filePath)}`, {
-            signal: fmp4Abort.signal,
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const reader = resp.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            await waitSb();
-            if (sb.buffered.length > 0 && videoEl.currentTime > 20) {
-              const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 10);
-              if (trimTo > sb.buffered.start(0) + 1) {
-                sb.remove(sb.buffered.start(0), trimTo);
-                await waitSb();
-              }
-            }
-            try { sb.appendBuffer(value instanceof Uint8Array ? value.buffer : value); } catch {}
-            if (!playStarted && sb.buffered.length > 0) {
-              playStarted = true;
-              videoEl.play().catch(() => {});
-            }
-          }
-        } catch (err) {
-          if (err.name === 'AbortError') return;
-          console.error('Recording stream error:', err.message);
-        }
-      })();
-    } else {
-      showVideoError('Recordings require MSE support (Chrome/Firefox/Edge).');
-    }
+    await startRecordingStream(filePath, 0);
 
     nowPlaying.style.display = 'flex';
     npChannel.innerHTML = `<span>${escHtml(svc || name)}</span>`;
     npTitle.textContent = name;
-    npTime.textContent = len ? `Dauer: ${len}` : '';
+    npTime.textContent = '';
     document.getElementById('npProgress').style.width = '0';
 
     // Show recording info in EPG panel
-    epgContent.innerHTML = '';
     const infoHtml = `
       <div class="epg-event current" style="border-left-color:var(--accent)">
         <div class="epg-event-time">Aufnahme${svc ? ' · ' + escHtml(svc) : ''}</div>
@@ -1240,7 +1280,38 @@
     `;
     epgContent.innerHTML = infoHtml;
     updatePip();
+
+    // Fetch duration and enable seek bar
+    try {
+      const dur = await apiFetch(`/api/recording-duration?file=${encodeURIComponent(filePath)}`);
+      recDuration = dur.duration || 0;
+      if (recDuration > 0) {
+        document.getElementById('recSeekTotal').textContent = fmtSecs(recDuration);
+        document.getElementById('recSeekCurrent').textContent = '0:00';
+        document.getElementById('recSeekFill').style.width = '0';
+        document.getElementById('recSeekThumb').style.left = '0';
+        document.getElementById('recSeekBar').style.display = 'flex';
+        clearInterval(recSeekTimer);
+        recSeekTimer = setInterval(updateRecSeekBar, 1000);
+      }
+    } catch (e) {
+      console.warn('Could not fetch recording duration:', e.message);
+    }
   }
+
+  // Seek bar click handler
+  document.getElementById('recSeekTrack').addEventListener('click', async e => {
+    if (!recDuration || !currentRecFile) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const seekTo = Math.floor(pct * recDuration);
+    clearInterval(recSeekTimer);
+    document.getElementById('recSeekCurrent').textContent = fmtSecs(seekTo);
+    document.getElementById('recSeekFill').style.width = `${pct * 100}%`;
+    document.getElementById('recSeekThumb').style.left = `${pct * 100}%`;
+    await startRecordingStream(currentRecFile, seekTo);
+    recSeekTimer = setInterval(updateRecSeekBar, 1000);
+  });
 
   function formatRecBytes(bytes) {
     if (bytes < 1024) return `${bytes} B`;
