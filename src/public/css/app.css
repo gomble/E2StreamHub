@@ -1824,6 +1824,209 @@ input { font-family: inherit; }
   white-space: nowrap;
 }
 
+/* ─── App Settings Overlay ────────────────────────────────────────────────── */
+.appsettings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .2s;
+}
+.appsettings-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+}
+.appsettings-overlay.open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.appsettings-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: var(--topbar-h);
+  background: var(--bg);
+  transform: translateY(30px);
+  transition: transform .2s;
+  overflow: hidden;
+}
+.appsettings-overlay.open .appsettings-panel { transform: translateY(0); }
+
+.appsettings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.appsettings-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.appsettings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Form grid */
+.as-form-grid {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.as-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.as-input {
+  width: 100%;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color .2s;
+}
+.as-input:focus { border-color: var(--accent); }
+.as-input::placeholder { color: var(--text-muted); }
+
+.as-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.as-msg {
+  font-size: 12px;
+  font-weight: 600;
+}
+.as-msg-err { color: #ef4444; }
+.as-msg-ok { color: #22c55e; }
+
+.as-save-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+/* Toggle switch */
+.as-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.as-toggle input[type="checkbox"] {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+  flex-shrink: 0;
+}
+.as-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform .2s, background .2s;
+}
+.as-toggle input[type="checkbox"]:checked {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.as-toggle input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+/* 2FA badges */
+.as-2fa-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  margin-right: 10px;
+}
+.as-2fa-on {
+  background: rgba(34,197,94,.15);
+  color: #22c55e;
+}
+.as-2fa-off {
+  background: var(--bg4);
+  color: var(--text-dim);
+}
+
+.as-2fa-info {
+  margin-top: 12px;
+}
+.as-2fa-info p {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.as-2fa-qr {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.as-2fa-qr img {
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+.as-2fa-secret {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 14px;
+  color: var(--accent);
+  text-align: center;
+  letter-spacing: 2px;
+  padding: 8px;
+  background: var(--bg4);
+  border-radius: 6px;
+  user-select: all;
+  margin-bottom: 8px;
+}
+
 /* ─── Picture-in-Picture ──────────────────────────────────────────────────── */
 .pip-window {
   display: none;

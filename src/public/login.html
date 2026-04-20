@@ -131,15 +131,20 @@
         <label for="password">Password</label>
         <input type="password" id="password" name="password" autocomplete="current-password" required />
       </div>
+      <div class="field" id="totpField" style="display:none">
+        <label for="totp">2FA Code</label>
+        <input type="text" id="totp" name="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-stelliger Code" />
+      </div>
       <button type="submit" id="submitBtn">Sign in</button>
     </form>
   </div>
 
   <script>
-    // Redirect to setup if not yet configured
     fetch('/api/setup/status').then(r => r.json()).then(d => {
       if (d.needsSetup) window.location.href = '/setup';
     }).catch(() => {});
+
+    let needs2fa = false;
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -149,19 +154,31 @@
       btn.textContent = 'Signing in…';
       errorMsg.classList.remove('visible');
 
+      const payload = {
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+      };
+      if (needs2fa) payload.totp = document.getElementById('totp').value;
+
       try {
         const res = await fetch('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: document.getElementById('username').value,
-            password: document.getElementById('password').value,
-          }),
+          body: JSON.stringify(payload),
         });
 
-        if (res.ok) {
+        const data = await res.json();
+
+        if (data.success === true) {
           window.location.href = '/';
+        } else if (data.requires2fa) {
+          needs2fa = true;
+          document.getElementById('totpField').style.display = '';
+          document.getElementById('totp').focus();
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
         } else {
+          errorMsg.textContent = data.error || 'Invalid credentials';
           errorMsg.classList.add('visible');
           btn.disabled = false;
           btn.textContent = 'Sign in';

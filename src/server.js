@@ -58,8 +58,10 @@ let ENIGMA2_STREAM_PORT = parseInt(cfg('ENIGMA2_STREAM_PORT', '8001'), 10);
 let ENIGMA2_USER = cfg('ENIGMA2_USER', '');
 let ENIGMA2_PASSWORD = cfg('ENIGMA2_PASSWORD', '');
 let ENIGMA2_SSH_PORT = parseInt(cfg('ENIGMA2_SSH_PORT', '22'), 10);
+let ENIGMA2_STREAM_AUTH = cfg('ENIGMA2_STREAM_AUTH', 'false').toLowerCase() === 'true';
 let APP_USERNAME = cfg('APP_USERNAME', 'admin');
 let APP_PASSWORD = cfg('APP_PASSWORD', 'admin');
+let APP_2FA_SECRET = cfg('APP_2FA_SECRET', '');
 let SESSION_SECRET = cfg('SESSION_SECRET', 'e2streamhub-change-this-secret');
 let FFMPEG_FORCE_VIDEO_TRANSCODE = cfg('FFMPEG_FORCE_VIDEO_TRANSCODE', 'false').toLowerCase() === 'true';
 let FFMPEG_PROBESIZE = cfg('FFMPEG_PROBESIZE', '10000000');
@@ -83,8 +85,10 @@ function applyConfig() {
   ENIGMA2_USER = cfg('ENIGMA2_USER', '');
   ENIGMA2_PASSWORD = cfg('ENIGMA2_PASSWORD', '');
   ENIGMA2_SSH_PORT = parseInt(cfg('ENIGMA2_SSH_PORT', '22'), 10);
+  ENIGMA2_STREAM_AUTH = cfg('ENIGMA2_STREAM_AUTH', 'false').toLowerCase() === 'true';
   APP_USERNAME = cfg('APP_USERNAME', 'admin');
   APP_PASSWORD = cfg('APP_PASSWORD', 'admin');
+  APP_2FA_SECRET = cfg('APP_2FA_SECRET', '');
   FFMPEG_FORCE_VIDEO_TRANSCODE = cfg('FFMPEG_FORCE_VIDEO_TRANSCODE', 'false').toLowerCase() === 'true';
   FFMPEG_PROBESIZE = cfg('FFMPEG_PROBESIZE', '10000000');
   FFMPEG_ANALYZEDURATION = cfg('FFMPEG_ANALYZEDURATION', '10000000');
@@ -94,6 +98,77 @@ function applyConfig() {
   enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
   enigmaAuth = ENIGMA2_USER ? { username: ENIGMA2_USER, password: ENIGMA2_PASSWORD } : null;
   _piconDirCache = null;
+}
+
+// ─── TOTP helpers (RFC 6238) ─────────────────────────────────────────────────
+
+function generateTotpSecret() {
+  const buf = crypto.randomBytes(20);
+  return base32Encode(buf);
+}
+
+function base32Encode(buf) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '', out = '';
+  for (const b of buf) bits += b.toString(2).padStart(8, '0');
+  for (let i = 0; i < bits.length; i += 5) {
+    const chunk = bits.slice(i, i + 5).padEnd(5, '0');
+    out += alphabet[parseInt(chunk, 2)];
+  }
+  return out;
+}
+
+function base32Decode(str) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const c of str.toUpperCase().replace(/=+$/, '')) {
+    const idx = alphabet.indexOf(c);
+    if (idx < 0) continue;
+    bits += idx.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+function totpCode(secret, timeStep = 30, digits = 6) {
+  const key = base32Decode(secret);
+  const epoch = Math.floor(Date.now() / 1000);
+  const counter = Math.floor(epoch / timeStep);
+  const buf = Buffer.alloc(8);
+  buf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+  buf.writeUInt32BE(counter & 0xffffffff, 4);
+  const hmac = crypto.createHmac('sha1', key).update(buf).digest();
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % (10 ** digits);
+  return String(code).padStart(digits, '0');
+}
+
+function verifyTotp(secret, token) {
+  for (let i = -1; i <= 1; i++) {
+    const epoch = Math.floor(Date.now() / 1000) + i * 30;
+    const counter = Math.floor(epoch / 30);
+    const buf = Buffer.alloc(8);
+    buf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+    buf.writeUInt32BE(counter & 0xffffffff, 4);
+    const key = base32Decode(secret);
+    const hmac = crypto.createHmac('sha1', key).update(buf).digest();
+    const offset = hmac[hmac.length - 1] & 0xf;
+    const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % 1000000;
+    if (String(code).padStart(6, '0') === String(token).padStart(6, '0')) return true;
+  }
+  return false;
+}
+
+function saveConfig(updates) {
+  const saved = loadSavedConfig();
+  Object.assign(saved, updates);
+  _savedConfig = null;
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(saved, null, 2));
+  applyConfig();
 }
 
 // Use a persistent path inside the container (not /tmp which Docker may flush)
@@ -154,7 +229,7 @@ app.post('/api/setup/save', (req, res) => {
   const config = {};
   const KEYS = [
     'ENIGMA2_HOST', 'ENIGMA2_PORT', 'ENIGMA2_STREAM_PORT', 'ENIGMA2_SSH_PORT',
-    'ENIGMA2_USER', 'ENIGMA2_PASSWORD',
+    'ENIGMA2_USER', 'ENIGMA2_PASSWORD', 'ENIGMA2_STREAM_AUTH',
     'APP_USERNAME', 'APP_PASSWORD',
     'FFMPEG_FORCE_VIDEO_TRANSCODE', 'FFMPEG_PROBESIZE', 'FFMPEG_ANALYZEDURATION',
     'FFMPEG_TRANSCODE_PRESET',
@@ -204,13 +279,18 @@ const requireAuth = (req, res, next) => {
 
 app.post('/auth/login', (req, res) => {
   if (needsSetup) return res.status(503).json({ error: 'Setup required' });
-  const { username, password } = req.body;
-  if (username === APP_USERNAME && password === APP_PASSWORD) {
-    req.session.authenticated = true;
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
+  const { username, password, totp } = req.body;
+  if (username !== APP_USERNAME || password !== APP_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+  if (APP_2FA_SECRET) {
+    if (!totp) return res.json({ success: false, requires2fa: true });
+    if (!verifyTotp(APP_2FA_SECRET, totp)) {
+      return res.status(401).json({ error: 'Invalid 2FA code' });
+    }
+  }
+  req.session.authenticated = true;
+  res.json({ success: true });
 });
 
 app.post('/auth/logout', (req, res) => {
@@ -219,6 +299,105 @@ app.post('/auth/logout', (req, res) => {
 
 app.get('/auth/check', (req, res) => {
   res.json({ authenticated: !!(req.session && req.session.authenticated) });
+});
+
+// ─── App settings (authenticated) ────────────────────────────────────────────
+
+app.get('/api/appsettings', requireAuth, (req, res) => {
+  const saved = loadSavedConfig();
+  res.json({
+    ENIGMA2_HOST:     ENIGMA2_HOST,
+    ENIGMA2_PORT:     String(ENIGMA2_PORT),
+    ENIGMA2_STREAM_PORT: String(ENIGMA2_STREAM_PORT),
+    ENIGMA2_SSH_PORT: String(ENIGMA2_SSH_PORT),
+    ENIGMA2_USER:     ENIGMA2_USER,
+    ENIGMA2_PASSWORD: ENIGMA2_PASSWORD,
+    ENIGMA2_STREAM_AUTH: String(ENIGMA2_STREAM_AUTH),
+    APP_USERNAME:     APP_USERNAME,
+    FFMPEG_FORCE_VIDEO_TRANSCODE: String(FFMPEG_FORCE_VIDEO_TRANSCODE),
+    FFMPEG_PROBESIZE: FFMPEG_PROBESIZE,
+    FFMPEG_ANALYZEDURATION: FFMPEG_ANALYZEDURATION,
+    FFMPEG_TRANSCODE_PRESET: FFMPEG_TRANSCODE_PRESET,
+    HLS_SEGMENT_SECONDS: String(HLS_SEGMENT_SECONDS),
+    HLS_LIST_SIZE: String(HLS_LIST_SIZE),
+    has2fa: !!APP_2FA_SECRET,
+  });
+});
+
+app.post('/api/appsettings', requireAuth, (req, res) => {
+  const body = req.body || {};
+  const updates = {};
+  const KEYS = [
+    'ENIGMA2_HOST', 'ENIGMA2_PORT', 'ENIGMA2_STREAM_PORT', 'ENIGMA2_SSH_PORT',
+    'ENIGMA2_USER', 'ENIGMA2_PASSWORD', 'ENIGMA2_STREAM_AUTH',
+    'FFMPEG_FORCE_VIDEO_TRANSCODE', 'FFMPEG_PROBESIZE', 'FFMPEG_ANALYZEDURATION',
+    'FFMPEG_TRANSCODE_PRESET', 'HLS_SEGMENT_SECONDS', 'HLS_LIST_SIZE',
+  ];
+  for (const k of KEYS) {
+    if (body[k] !== undefined) updates[k] = body[k];
+  }
+  try {
+    saveConfig(updates);
+    console.log('[settings] Configuration updated');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/appsettings/password', requireAuth, (req, res) => {
+  const { currentPassword, newUsername, newPassword } = req.body;
+  if (!currentPassword || currentPassword !== APP_PASSWORD) {
+    return res.status(403).json({ error: 'Aktuelles Passwort falsch' });
+  }
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ error: 'Neues Passwort zu kurz (min. 4 Zeichen)' });
+  }
+  const updates = { APP_PASSWORD: newPassword };
+  if (newUsername && newUsername.trim()) updates.APP_USERNAME = newUsername.trim();
+  try {
+    saveConfig(updates);
+    console.log('[settings] Password changed');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/appsettings/2fa/setup', requireAuth, (req, res) => {
+  const secret = generateTotpSecret();
+  const otpauthUrl = `otpauth://totp/E2StreamHub:${encodeURIComponent(APP_USERNAME)}?secret=${secret}&issuer=E2StreamHub&digits=6&period=30`;
+  req.session._pending2faSecret = secret;
+  res.json({ secret, otpauthUrl });
+});
+
+app.post('/api/appsettings/2fa/confirm', requireAuth, (req, res) => {
+  const { token } = req.body;
+  const secret = req.session._pending2faSecret;
+  if (!secret) return res.status(400).json({ error: 'Kein 2FA-Setup aktiv' });
+  if (!verifyTotp(secret, token)) {
+    return res.status(400).json({ error: 'Ungültiger Code — bitte erneut versuchen' });
+  }
+  try {
+    saveConfig({ APP_2FA_SECRET: secret });
+    delete req.session._pending2faSecret;
+    console.log('[settings] 2FA enabled');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/appsettings/2fa/disable', requireAuth, (req, res) => {
+  const { password } = req.body;
+  if (password !== APP_PASSWORD) return res.status(403).json({ error: 'Passwort falsch' });
+  try {
+    saveConfig({ APP_2FA_SECRET: '' });
+    console.log('[settings] 2FA disabled');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─── Enigma2 proxy helper ─────────────────────────────────────────────────────
@@ -276,8 +455,11 @@ function touchHlsSession(sessionId) {
 }
 
 function buildSourceUrl(sRef) {
-  // Port 8001 is the Enigma2 streaming port — it does not use HTTP auth.
-  // Credentials only apply to the OpenWebif API on ENIGMA2_PORT (usually 80).
+  // Most Enigma2 boxes: port 8001 needs no auth.
+  // Gigablue boxes: stream port requires HTTP basic auth — enable via ENIGMA2_STREAM_AUTH.
+  if (ENIGMA2_STREAM_AUTH && ENIGMA2_USER) {
+    return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+  }
   return `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
 }
 

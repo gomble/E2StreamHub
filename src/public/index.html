@@ -21,6 +21,7 @@
     <button class="nav-btn" data-view="receiver">Receiver</button>
   </nav>
   <div class="topbar-right">
+    <button class="nav-btn" id="appSettingsBtn" title="App Settings">⚙</button>
     <button class="nav-btn" id="logToggleBtn" title="Server Log">Log</button>
     <span class="status-dot" id="statusDot" title="Receiver Status"></span>
     <span class="current-time" id="currentTime"></span>
@@ -443,6 +444,136 @@
   </div>
 </div>
 
+<!-- ─── App Settings Overlay ──────────────────────────────────────────────── -->
+<div class="appsettings-overlay" id="appSettingsOverlay" aria-hidden="true">
+  <div class="appsettings-panel">
+    <div class="appsettings-header">
+      <span class="appsettings-title">App Settings</span>
+      <button class="epg-overlay-close" id="appSettingsCloseBtn" title="Close">✕</button>
+    </div>
+    <div class="appsettings-body">
+
+      <!-- Password Change -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Zugangsdaten ändern</h3>
+        <div class="as-form-grid">
+          <label class="as-label">Aktuelles Passwort</label>
+          <input class="as-input" id="asCurPwd" type="password" autocomplete="current-password" />
+          <label class="as-label">Neuer Benutzername</label>
+          <input class="as-input" id="asNewUser" type="text" placeholder="(unverändert lassen)" autocomplete="username" />
+          <label class="as-label">Neues Passwort</label>
+          <input class="as-input" id="asNewPwd" type="password" placeholder="mind. 4 Zeichen" autocomplete="new-password" />
+          <label class="as-label">Passwort bestätigen</label>
+          <input class="as-input" id="asNewPwd2" type="password" autocomplete="new-password" />
+        </div>
+        <div class="as-actions">
+          <button class="btn-secondary" id="asPwdSave">Passwort ändern</button>
+          <span class="as-msg" id="asPwdMsg"></span>
+        </div>
+      </section>
+
+      <!-- 2FA -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Zwei-Faktor-Authentifizierung (TOTP)</h3>
+        <div id="as2faStatus"></div>
+        <div id="as2faSetup" style="display:none">
+          <div class="as-2fa-info">
+            <p>Scanne den QR-Code mit deiner Authenticator-App oder gib den Secret manuell ein:</p>
+            <div class="as-2fa-qr" id="as2faQr"></div>
+            <div class="as-2fa-secret" id="as2faSecret"></div>
+          </div>
+          <div class="as-form-grid" style="margin-top:12px">
+            <label class="as-label">Bestätigungscode</label>
+            <input class="as-input" id="as2faToken" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-stelliger Code" />
+          </div>
+          <div class="as-actions">
+            <button class="btn-secondary" id="as2faConfirm">2FA aktivieren</button>
+            <button class="btn-secondary" id="as2faCancel">Abbrechen</button>
+            <span class="as-msg" id="as2faMsg"></span>
+          </div>
+        </div>
+        <div id="as2faDisable" style="display:none">
+          <div class="as-form-grid">
+            <label class="as-label">Passwort zur Bestätigung</label>
+            <input class="as-input" id="as2faDisablePwd" type="password" />
+          </div>
+          <div class="as-actions">
+            <button class="btn-secondary rcv-btn-danger" id="as2faDisableBtn">2FA deaktivieren</button>
+            <span class="as-msg" id="as2faDisableMsg"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Receiver Connection -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Receiver Verbindung</h3>
+        <div class="as-form-grid">
+          <label class="as-label">Host / IP</label>
+          <input class="as-input" id="asEnigmaHost" type="text" />
+          <label class="as-label">OpenWebif Port</label>
+          <input class="as-input" id="asEnigmaPort" type="number" />
+          <label class="as-label">Stream Port</label>
+          <input class="as-input" id="asStreamPort" type="number" />
+          <label class="as-label">SSH Port</label>
+          <input class="as-input" id="asSshPort" type="number" />
+          <label class="as-label">Benutzername</label>
+          <input class="as-input" id="asEnigmaUser" type="text" />
+          <label class="as-label">Passwort</label>
+          <input class="as-input" id="asEnigmaPwd" type="password" />
+          <label class="as-label">Stream Auth (Gigablue)</label>
+          <label class="as-toggle">
+            <input type="checkbox" id="asStreamAuth" />
+            <span class="as-toggle-text">HTTP Basic Auth für Stream-Port aktivieren</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- FFmpeg Settings -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">FFmpeg Einstellungen</h3>
+        <div class="as-form-grid">
+          <label class="as-label">Video-Transcode</label>
+          <label class="as-toggle">
+            <input type="checkbox" id="asTranscode" />
+            <span class="as-toggle-text">Video re-encoding aktivieren</span>
+          </label>
+          <label class="as-label">Probesize</label>
+          <input class="as-input" id="asProbesize" type="text" />
+          <label class="as-label">Analyzeduration</label>
+          <input class="as-input" id="asAnalyze" type="text" />
+          <label class="as-label">Transcode Preset</label>
+          <select class="bouquet-select" id="asPreset">
+            <option value="ultrafast">ultrafast</option>
+            <option value="superfast">superfast</option>
+            <option value="veryfast">veryfast</option>
+            <option value="faster">faster</option>
+            <option value="fast">fast</option>
+            <option value="medium">medium</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- HLS Settings -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">HLS Einstellungen</h3>
+        <div class="as-form-grid">
+          <label class="as-label">Segment-Dauer (Sek.)</label>
+          <input class="as-input" id="asHlsSeg" type="number" min="1" max="30" />
+          <label class="as-label">List Size</label>
+          <input class="as-input" id="asHlsList" type="number" min="1" max="50" />
+        </div>
+      </section>
+
+      <!-- Save all -->
+      <div class="as-save-row">
+        <button class="btn-accent" id="asSaveAll">Einstellungen speichern</button>
+        <span class="as-msg" id="asSaveMsg"></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- ─── PiP Window ───────────────────────────────────────────────────────── -->
 <div class="pip-window" id="pipWindow">
   <span class="pip-channel-badge" id="pipChannel"></span>
@@ -458,5 +589,6 @@
 <script src="/js/epg-timeline.js"></script>
 <script src="/js/bouquet-editor.js"></script>
 <script src="/js/receiver-settings.js"></script>
+<script src="/js/app-settings.js"></script>
 </body>
 </html>

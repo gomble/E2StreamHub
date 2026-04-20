@@ -140,6 +140,7 @@
   const epgOverlay = document.getElementById('epgOverlay');
   const editorOverlay = document.getElementById('editorOverlay');
   const receiverOverlay = document.getElementById('receiverOverlay');
+  const appSettingsOverlay = document.getElementById('appSettingsOverlay');
 
   // ─── Picture-in-Picture ────────────────────────────────────────────────────
   const pipWindow       = document.getElementById('pipWindow');
@@ -165,7 +166,8 @@
   function updatePip() {
     const anyOpen = epgOverlay.classList.contains('open')
                  || editorOverlay.classList.contains('open')
-                 || receiverOverlay.classList.contains('open');
+                 || receiverOverlay.classList.contains('open')
+                 || appSettingsOverlay.classList.contains('open');
     if (anyOpen && currentSRef) showPip();
     else hidePip();
   }
@@ -852,14 +854,15 @@
   window._syncEpgBouquetSelect = syncEpgBouquetSelect;
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-  async function apiFetch(url) {
-    const res = await fetch(url);
+  async function apiFetch(url, opts) {
+    const res = await fetch(url, opts);
     if (res.status === 401) {
       window.location.href = '/login.html';
       throw new Error('Unauthorized');
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
   }
 
   function escHtml(str) {
