@@ -12,7 +12,8 @@ const { Client: SshClient } = require('ssh2');
 
 // HTTP keep-alive agent so axios reuses connections to the receiver
 const _keepAliveAgent = new http.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5 });
-_keepAliveAgent.setMaxListeners(50);
+// Reused sockets accumulate error listeners — raise the limit to avoid warnings
+require('events').EventEmitter.defaultMaxListeners = 30;
 
 const app = express();
 const PORT = process.env.PORT || 2000;
@@ -1729,9 +1730,6 @@ app.get('/stream-fmp4', requireAuth, async (req, res) => {
     '-analyzeduration', isRecording ? FFMPEG_ANALYZEDURATION : '500000',
   ];
   if (!isRecording) ffArgs.push('-flags', 'low_delay', '-thread_queue_size', '512');
-  if (!isRecording && sourceUrl.startsWith('http')) {
-    ffArgs.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
-  }
   ffArgs.push('-i', sourceUrl, '-ignore_unknown');
 
   if (programNum) {
