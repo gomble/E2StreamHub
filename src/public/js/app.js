@@ -1065,6 +1065,131 @@
   logCloseBtn.addEventListener('click', closeLogPanel);
   logClearBtn.addEventListener('click', () => { logBody.innerHTML = ''; });
 
+  // ─── Sidebar Tabs ─────────────────────────────────────────────────────────
+  const sidebarTabs = document.querySelectorAll('.sidebar-tab');
+  const sidebarPanels = document.querySelectorAll('.sidebar-panel');
+  let recordingsLoaded = false;
+
+  sidebarTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      sidebarTabs.forEach(t => t.classList.remove('active'));
+      sidebarPanels.forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.sidebar === 'recordings' ? 'sidebarRecordings' : 'sidebarChannels';
+      document.getElementById(target).classList.add('active');
+      if (tab.dataset.sidebar === 'recordings' && !recordingsLoaded) {
+        loadRecordings();
+      }
+    });
+  });
+
+  // ─── Recordings ───────────────────────────────────────────────────────────
+  const recList = document.getElementById('recList');
+  const recSearch = document.getElementById('recSearch');
+  let allRecordings = [];
+
+  async function loadRecordings() {
+    recList.innerHTML = '<div class="list-placeholder">Lade Aufnahmen…</div>';
+    try {
+      const data = await apiFetch('/api/recordings');
+      allRecordings = (data.movies || []).filter(m => m.servicereference || m.filename);
+      recordingsLoaded = true;
+      renderRecordings(allRecordings);
+    } catch (err) {
+      recList.innerHTML = `<div class="list-placeholder">Fehler: ${escHtml(err.message)}</div>`;
+    }
+  }
+
+  function renderRecordings(movies) {
+    if (movies.length === 0) {
+      recList.innerHTML = '<div class="list-placeholder">Keine Aufnahmen</div>';
+      return;
+    }
+    recList.innerHTML = '';
+    movies.forEach(m => {
+      const name = m.eventname || m.filename || '–';
+      const svc = m.servicename || '';
+      const len = m.length || '';
+      const size = m.filesize ? formatRecBytes(m.filesize) : '';
+      const desc = m.description || '';
+      const sRef = m.servicereference || '';
+      const filename = m.filename || '';
+
+      const item = document.createElement('div');
+      item.className = 'rec-item';
+      item.dataset.sref = sRef;
+      item.dataset.filename = filename;
+      item.innerHTML = `
+        <div class="rec-item-name" title="${escHtml(name)}">${escHtml(name)}</div>
+        <div class="rec-item-meta">${escHtml(svc)}${len ? ' · ' + escHtml(len) : ''}${size ? ' · ' + size : ''}${desc ? ' · ' + escHtml(desc) : ''}</div>
+      `;
+      item.addEventListener('click', () => {
+        recList.querySelectorAll('.rec-item').forEach(el => el.classList.remove('active'));
+        item.classList.add('active');
+        playRecording(sRef, filename, name);
+      });
+      recList.appendChild(item);
+    });
+  }
+
+  recSearch.addEventListener('input', () => {
+    const q = recSearch.value.toLowerCase();
+    const filtered = q
+      ? allRecordings.filter(m =>
+          (m.eventname || '').toLowerCase().includes(q) ||
+          (m.servicename || '').toLowerCase().includes(q) ||
+          (m.description || '').toLowerCase().includes(q) ||
+          (m.filename || '').toLowerCase().includes(q))
+      : allRecordings;
+    renderRecordings(filtered);
+  });
+
+  async function playRecording(sRef, filename, name) {
+    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+    currentSRef = sRef;
+    currentChannelName = name;
+
+    videoOverlay.classList.add('hidden');
+    bufferingSpinner.classList.add('visible');
+    await stopCurrentPlayback();
+
+    videoEl.onwaiting = () => bufferingSpinner.classList.add('visible');
+    videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
+    videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
+
+    if (fmp4Supported()) {
+      try {
+        await startFmp4Playback(sRef, null);
+      } catch (err) {
+        console.warn('Recording fMP4 failed:', err.message);
+        tryMpegtsPlayback(sRef);
+      }
+    } else {
+      try {
+        await startHlsPlayback(sRef, null);
+      } catch (err) {
+        console.warn('Recording HLS failed:', err.message);
+        tryMpegtsPlayback(sRef);
+      }
+    }
+
+    nowPlaying.style.display = 'flex';
+    npChannel.innerHTML = `<span>${escHtml(name)}</span>`;
+    npTitle.textContent = '';
+    npTime.textContent = '';
+    document.getElementById('npProgress').style.width = '0';
+
+    epgContent.innerHTML = '<div class="epg-empty">Aufnahme wird abgespielt</div>';
+    updatePip();
+  }
+
+  function formatRecBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+    return `${(bytes / 1073741824).toFixed(1)} GB`;
+  }
+
   // ─── Boot ─────────────────────────────────────────────────────────────────
   loadBouquets();
 

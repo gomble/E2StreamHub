@@ -32,14 +32,28 @@
 <!-- ─── Player View ──────────────────────────────────────────────────────── -->
 <div class="view active" id="viewPlayer">
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <select class="bouquet-select" id="bouquetSelect">
-        <option value="">Loading bouquets…</option>
-      </select>
-      <input class="channel-search" id="channelSearch" type="search" placeholder="Search channels…" autocomplete="off" />
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" data-sidebar="channels">Kanäle</button>
+      <button class="sidebar-tab" data-sidebar="recordings">Aufnahmen</button>
     </div>
-    <div class="channel-list" id="channelList">
-      <div class="list-placeholder">Please select a bouquet</div>
+    <div class="sidebar-panel active" id="sidebarChannels">
+      <div class="sidebar-header">
+        <select class="bouquet-select" id="bouquetSelect">
+          <option value="">Loading bouquets…</option>
+        </select>
+        <input class="channel-search" id="channelSearch" type="search" placeholder="Search channels…" autocomplete="off" />
+      </div>
+      <div class="channel-list" id="channelList">
+        <div class="list-placeholder">Please select a bouquet</div>
+      </div>
+    </div>
+    <div class="sidebar-panel" id="sidebarRecordings">
+      <div class="sidebar-header">
+        <input class="channel-search" id="recSearch" type="search" placeholder="Aufnahme suchen…" autocomplete="off" />
+      </div>
+      <div class="channel-list" id="recList">
+        <div class="list-placeholder">Lade Aufnahmen…</div>
+      </div>
     </div>
   </aside>
 

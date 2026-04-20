@@ -141,6 +141,39 @@ input { font-family: inherit; }
   overflow: hidden;
 }
 
+/* Sidebar tabs */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg2);
+}
+.sidebar-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 0;
+  cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+.sidebar-tab:hover { color: var(--text); }
+.sidebar-tab.active { color: #fff; border-bottom-color: var(--accent); }
+
+.sidebar-panel {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+.sidebar-panel.active {
+  display: flex;
+}
+
 .sidebar-header {
   padding: 12px;
   border-bottom: 1px solid var(--border);
@@ -256,6 +289,37 @@ input { font-family: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+}
+
+/* ─── Recording items in sidebar ───────────────────────────────────────────── */
+.rec-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 14px;
+  cursor: pointer;
+  transition: background .15s;
+  border-left: 3px solid transparent;
+}
+.rec-item:hover { background: var(--bg4); }
+.rec-item.active {
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
+}
+.rec-item-name {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rec-item-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ─── Picons ────────────────────────────────────────────────────────────────── */
