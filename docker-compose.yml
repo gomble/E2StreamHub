@@ -4,27 +4,29 @@ services:
     container_name: e2streamhub
     ports:
       - "2000:2000"
-    environment:
-      # IP address / hostname of your Enigma2 receiver (Gigablue Quad 4K Pro)
-      - ENIGMA2_HOST=192.168.1.100
-      # OpenWebif HTTP port (default: 80)
-      - ENIGMA2_PORT=80
-      # Streaming port (default: 8001)
-      - ENIGMA2_STREAM_PORT=8001
-      # Receiver credentials (leave empty if no auth is configured)
-      - ENIGMA2_USER=
-      - ENIGMA2_PASSWORD=
-      # Web interface login credentials (change these!)
-      - APP_USERNAME=admin
-      - APP_PASSWORD=admin
-      # Random secret for session signing (change this!)
-      - SESSION_SECRET=please-change-this-to-a-random-32-char-string
-      - FFMPEG_FORCE_VIDEO_TRANSCODE=false
-      - FFMPEG_PROBESIZE=10000000
-      - FFMPEG_ANALYZEDURATION=10000000
-      - FFMPEG_TRANSCODE_PRESET=veryfast
-      - HLS_SEGMENT_SECONDS=2
-      - HLS_LIST_SIZE=4
+    # Environment variables are OPTIONAL — if omitted, the web-based setup
+    # wizard will ask for all settings on first launch and persist them.
+    # Any variable set here takes priority over the saved config.
+    environment: {}
+    # To use environment variables instead of the setup wizard, uncomment below:
+    # environment:
+    #   - ENIGMA2_HOST=192.168.1.100
+    #   - ENIGMA2_PORT=80
+    #   - ENIGMA2_STREAM_PORT=8001
+    #   - ENIGMA2_USER=
+    #   - ENIGMA2_PASSWORD=
+    #   - APP_USERNAME=admin
+    #   - APP_PASSWORD=admin
+    #   - SESSION_SECRET=please-change-this-to-a-random-32-char-string
+    #   - FFMPEG_FORCE_VIDEO_TRANSCODE=false
+    #   - FFMPEG_PROBESIZE=10000000
+    #   - FFMPEG_ANALYZEDURATION=10000000
+    #   - FFMPEG_TRANSCODE_PRESET=veryfast
+    #   - HLS_SEGMENT_SECONDS=2
+    #   - HLS_LIST_SIZE=4
+    volumes:
+      # Persist setup config across container restarts
+      - e2streamhub-data:/app/data
     tmpfs:
       # RAM disk for HLS sessions (old-iOS fallback) — no overlay-fs race conditions
       - /app/hls-sessions:size=128m
@@ -32,3 +34,6 @@ services:
     # Network mode: use "host" on Linux to allow direct LAN access to the receiver.
     # In bridge mode make sure ENIGMA2_HOST is reachable from the container.
     # network_mode: host
+
+volumes:
+  e2streamhub-data:

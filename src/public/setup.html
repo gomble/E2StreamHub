@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E2StreamHub – Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .setup-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 560px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon { font-size: 48px; line-height: 1; }
+
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 12px;
+      letter-spacing: -.5px;
+    }
+
+    .logo p {
+      font-size: 13px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #e50914;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .field-row .field { flex: 1; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      margin-bottom: 5px;
+    }
+
+    label .hint {
+      font-weight: 400;
+      color: #555;
+    }
+
+    input, select {
+      width: 100%;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 14px;
+      font-family: inherit;
+      padding: 10px 12px;
+      transition: border-color .2s;
+      outline: none;
+    }
+
+    input:focus, select:focus { border-color: #e50914; }
+    input::placeholder { color: #444; }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      flex: 1;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 12px;
+      cursor: pointer;
+      transition: background .2s, opacity .2s;
+    }
+
+    .btn-primary {
+      background: #e50914;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #c0060f; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #242424;
+      color: #e0e0e0;
+      border: 1px solid #333;
+    }
+    .btn-secondary:hover { border-color: #e50914; }
+
+    .status-msg {
+      margin-top: 16px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: rgba(34, 197, 94, .15);
+      border: 1px solid rgba(34, 197, 94, .4);
+      color: #4ade80;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: rgba(229, 9, 20, .15);
+      border: 1px solid rgba(229, 9, 20, .4);
+      color: #ff6b6b;
+    }
+
+    .status-msg.info {
+      display: block;
+      background: rgba(59, 130, 246, .15);
+      border: 1px solid rgba(59, 130, 246, .4);
+      color: #60a5fa;
+    }
+
+    .toggle-advanced {
+      background: transparent;
+      border: none;
+      color: #888;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 4px 0;
+      transition: color .2s;
+    }
+    .toggle-advanced:hover { color: #e0e0e0; }
+
+    .advanced { display: none; }
+    .advanced.open { display: block; }
+  </style>
+</head>
+<body>
+  <div class="setup-card">
+    <div class="logo">
+      <div class="logo-icon">📺</div>
+      <h1>E2StreamHub</h1>
+      <p>Ersteinrichtung</p>
+    </div>
+
+    <form id="setupForm" autocomplete="off">
+      <!-- Enigma2 Receiver -->
+      <div class="section">
+        <div class="section-title">Enigma2 Receiver</div>
+        <div class="field">
+          <label for="s_host">IP-Adresse / Hostname</label>
+          <input type="text" id="s_host" placeholder="192.168.1.100" required />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="s_port">Web-Port <span class="hint">(OpenWebif)</span></label>
+            <input type="number" id="s_port" value="80" min="1" max="65535" />
+          </div>
+          <div class="field">
+            <label for="s_stream_port">Stream-Port</label>
+            <input type="number" id="s_stream_port" value="8001" min="1" max="65535" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="s_user">Benutzer <span class="hint">(optional)</span></label>
+            <input type="text" id="s_user" placeholder="root" />
+          </div>
+          <div class="field">
+            <label for="s_pass">Passwort</label>
+            <input type="password" id="s_pass" placeholder="" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="s_ssh_port">SSH-Port <span class="hint">(fuer Picon-Upload / Bouquet-Editor)</span></label>
+          <input type="number" id="s_ssh_port" value="22" min="1" max="65535" />
+        </div>
+        <button type="button" class="btn btn-secondary" id="testBtn" style="margin-top:4px">Verbindung testen</button>
+        <div class="status-msg" id="testResult"></div>
+      </div>
+
+      <!-- Web Login -->
+      <div class="section">
+        <div class="section-title">Web-Login</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="s_app_user">Benutzername</label>
+            <input type="text" id="s_app_user" value="admin" required />
+          </div>
+          <div class="field">
+            <label for="s_app_pass">Passwort</label>
+            <input type="password" id="s_app_pass" placeholder="Neues Passwort" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced -->
+      <button type="button" class="toggle-advanced" id="toggleAdvanced">Erweiterte Einstellungen anzeigen ▾</button>
+      <div class="advanced" id="advancedSection">
+        <div class="section" style="margin-top:14px">
+          <div class="section-title">FFmpeg</div>
+          <div class="field-row">
+            <div class="field">
+              <label for="s_transcode">Video-Transcode erzwingen</label>
+              <select id="s_transcode">
+                <option value="false">Nein (Standard)</option>
+                <option value="true">Ja</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="s_preset">Transcode-Preset</label>
+              <select id="s_preset">
+                <option value="ultrafast">ultrafast</option>
+                <option value="superfast">superfast</option>
+                <option value="veryfast" selected>veryfast</option>
+                <option value="faster">faster</option>
+                <option value="fast">fast</option>
+                <option value="medium">medium</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="s_probesize">Probesize</label>
+              <input type="text" id="s_probesize" value="10000000" />
+            </div>
+            <div class="field">
+              <label for="s_analyzedur">Analyzeduration</label>
+              <input type="text" id="s_analyzedur" value="10000000" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" id="saveBtn">Speichern & Starten</button>
+      </div>
+      <div class="status-msg" id="saveResult"></div>
+    </form>
+  </div>
+
+  <script>
+    // Redirect away if already configured
+    fetch('/api/setup/status').then(r => r.json()).then(d => {
+      if (!d.needsSetup) window.location.href = '/';
+    }).catch(() => {});
+
+    // Load defaults
+    fetch('/api/setup/defaults').then(r => r.json()).then(d => {
+      if (d.ENIGMA2_HOST && d.ENIGMA2_HOST !== '192.168.1.100')
+        document.getElementById('s_host').value = d.ENIGMA2_HOST;
+      if (d.ENIGMA2_PORT)        document.getElementById('s_port').value = d.ENIGMA2_PORT;
+      if (d.ENIGMA2_STREAM_PORT) document.getElementById('s_stream_port').value = d.ENIGMA2_STREAM_PORT;
+      if (d.ENIGMA2_SSH_PORT)    document.getElementById('s_ssh_port').value = d.ENIGMA2_SSH_PORT;
+      if (d.ENIGMA2_USER)        document.getElementById('s_user').value = d.ENIGMA2_USER;
+      if (d.ENIGMA2_PASSWORD)    document.getElementById('s_pass').value = d.ENIGMA2_PASSWORD;
+      if (d.APP_USERNAME)        document.getElementById('s_app_user').value = d.APP_USERNAME;
+      if (d.APP_PASSWORD)        document.getElementById('s_app_pass').value = d.APP_PASSWORD;
+      if (d.FFMPEG_FORCE_VIDEO_TRANSCODE) document.getElementById('s_transcode').value = d.FFMPEG_FORCE_VIDEO_TRANSCODE;
+      if (d.FFMPEG_TRANSCODE_PRESET)      document.getElementById('s_preset').value = d.FFMPEG_TRANSCODE_PRESET;
+      if (d.FFMPEG_PROBESIZE)    document.getElementById('s_probesize').value = d.FFMPEG_PROBESIZE;
+      if (d.FFMPEG_ANALYZEDURATION) document.getElementById('s_analyzedur').value = d.FFMPEG_ANALYZEDURATION;
+    }).catch(() => {});
+
+    // Toggle advanced
+    document.getElementById('toggleAdvanced').addEventListener('click', () => {
+      const sec = document.getElementById('advancedSection');
+      const btn = document.getElementById('toggleAdvanced');
+      sec.classList.toggle('open');
+      btn.textContent = sec.classList.contains('open')
+        ? 'Erweiterte Einstellungen ausblenden ▴'
+        : 'Erweiterte Einstellungen anzeigen ▾';
+    });
+
+    // Test connection
+    document.getElementById('testBtn').addEventListener('click', async () => {
+      const result = document.getElementById('testResult');
+      const btn = document.getElementById('testBtn');
+      btn.disabled = true;
+      btn.textContent = 'Teste…';
+      result.className = 'status-msg info';
+      result.textContent = 'Verbinde mit Receiver…';
+      result.style.display = 'block';
+
+      try {
+        const resp = await fetch('/api/setup/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            host: document.getElementById('s_host').value,
+            port: document.getElementById('s_port').value,
+            user: document.getElementById('s_user').value,
+            password: document.getElementById('s_pass').value,
+          }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          result.className = 'status-msg success';
+          let msg = 'Verbindung erfolgreich!';
+          if (data.model) msg += `  Modell: ${data.model}`;
+          if (data.image) msg += `  Image: ${data.image}`;
+          result.textContent = msg;
+        } else {
+          result.className = 'status-msg error';
+          result.textContent = 'Verbindung fehlgeschlagen: ' + (data.error || 'Unbekannter Fehler');
+        }
+      } catch (e) {
+        result.className = 'status-msg error';
+        result.textContent = 'Fehler: ' + e.message;
+      }
+      btn.disabled = false;
+      btn.textContent = 'Verbindung testen';
+    });
+
+    // Save
+    document.getElementById('setupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('saveBtn');
+      const result = document.getElementById('saveResult');
+      btn.disabled = true;
+      btn.textContent = 'Speichere…';
+
+      const config = {
+        ENIGMA2_HOST:     document.getElementById('s_host').value.trim(),
+        ENIGMA2_PORT:     document.getElementById('s_port').value,
+        ENIGMA2_STREAM_PORT: document.getElementById('s_stream_port').value,
+        ENIGMA2_SSH_PORT: document.getElementById('s_ssh_port').value,
+        ENIGMA2_USER:     document.getElementById('s_user').value.trim(),
+        ENIGMA2_PASSWORD: document.getElementById('s_pass').value,
+        APP_USERNAME:     document.getElementById('s_app_user').value.trim(),
+        APP_PASSWORD:     document.getElementById('s_app_pass').value,
+        FFMPEG_FORCE_VIDEO_TRANSCODE: document.getElementById('s_transcode').value,
+        FFMPEG_TRANSCODE_PRESET:      document.getElementById('s_preset').value,
+        FFMPEG_PROBESIZE:             document.getElementById('s_probesize').value,
+        FFMPEG_ANALYZEDURATION:       document.getElementById('s_analyzedur').value,
+      };
+
+      try {
+        const resp = await fetch('/api/setup/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          result.className = 'status-msg success';
+          result.textContent = 'Konfiguration gespeichert! Weiterleitung…';
+          result.style.display = 'block';
+          setTimeout(() => { window.location.href = '/login.html'; }, 1200);
+        } else {
+          result.className = 'status-msg error';
+          result.textContent = data.error || 'Fehler beim Speichern';
+          result.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Speichern & Starten';
+        }
+      } catch (err) {
+        result.className = 'status-msg error';
+        result.textContent = 'Server-Fehler: ' + err.message;
+        result.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Speichern & Starten';
+      }
+    });
+  </script>
+</body>
+</html>

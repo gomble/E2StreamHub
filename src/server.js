@@ -31,26 +31,69 @@ console.log   = (...args) => { _origLog(...args);   broadcastLog('info',  args);
 console.warn  = (...args) => { _origWarn(...args);   broadcastLog('warn',  args); };
 console.error = (...args) => { _origError(...args);  broadcastLog('error', args); };
 
-const ENIGMA2_HOST = process.env.ENIGMA2_HOST || '192.168.1.100';
-const ENIGMA2_PORT = parseInt(process.env.ENIGMA2_PORT || '80', 10);
-const ENIGMA2_STREAM_PORT = parseInt(process.env.ENIGMA2_STREAM_PORT || '8001', 10);
-const ENIGMA2_USER = process.env.ENIGMA2_USER || '';
-const ENIGMA2_PASSWORD = process.env.ENIGMA2_PASSWORD || '';
-const ENIGMA2_SSH_PORT = parseInt(process.env.ENIGMA2_SSH_PORT || '22', 10);
-const APP_USERNAME = process.env.APP_USERNAME || 'admin';
-const APP_PASSWORD = process.env.APP_PASSWORD || 'admin';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'e2streamhub-change-this-secret';
-const FFMPEG_FORCE_VIDEO_TRANSCODE = String(process.env.FFMPEG_FORCE_VIDEO_TRANSCODE || '').toLowerCase() === 'true';
-const FFMPEG_PROBESIZE = process.env.FFMPEG_PROBESIZE || '10000000';
-const FFMPEG_ANALYZEDURATION = process.env.FFMPEG_ANALYZEDURATION || '10000000';
-const FFMPEG_TRANSCODE_PRESET = process.env.FFMPEG_TRANSCODE_PRESET || 'veryfast';
-const HLS_SEGMENT_SECONDS = parseInt(process.env.HLS_SEGMENT_SECONDS || '2', 10);
-const HLS_LIST_SIZE = parseInt(process.env.HLS_LIST_SIZE || '4', 10);
+// ─── Config persistence (ENV > config.json > default) ────────────────────────
+const CONFIG_DIR = path.join(__dirname, '..', 'data');
+const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
-const enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
-const enigmaAuth = ENIGMA2_USER
+let _savedConfig = null;
+function loadSavedConfig() {
+  if (_savedConfig === null) {
+    try { _savedConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }
+    catch { _savedConfig = {}; }
+  }
+  return _savedConfig;
+}
+
+function cfg(key, defaultVal) {
+  if (process.env[key]) return process.env[key];
+  const saved = loadSavedConfig();
+  if (saved[key] !== undefined && saved[key] !== '') return String(saved[key]);
+  return defaultVal;
+}
+
+let ENIGMA2_HOST = cfg('ENIGMA2_HOST', '192.168.1.100');
+let ENIGMA2_PORT = parseInt(cfg('ENIGMA2_PORT', '80'), 10);
+let ENIGMA2_STREAM_PORT = parseInt(cfg('ENIGMA2_STREAM_PORT', '8001'), 10);
+let ENIGMA2_USER = cfg('ENIGMA2_USER', '');
+let ENIGMA2_PASSWORD = cfg('ENIGMA2_PASSWORD', '');
+let ENIGMA2_SSH_PORT = parseInt(cfg('ENIGMA2_SSH_PORT', '22'), 10);
+let APP_USERNAME = cfg('APP_USERNAME', 'admin');
+let APP_PASSWORD = cfg('APP_PASSWORD', 'admin');
+let SESSION_SECRET = cfg('SESSION_SECRET', 'e2streamhub-change-this-secret');
+let FFMPEG_FORCE_VIDEO_TRANSCODE = cfg('FFMPEG_FORCE_VIDEO_TRANSCODE', 'false').toLowerCase() === 'true';
+let FFMPEG_PROBESIZE = cfg('FFMPEG_PROBESIZE', '10000000');
+let FFMPEG_ANALYZEDURATION = cfg('FFMPEG_ANALYZEDURATION', '10000000');
+let FFMPEG_TRANSCODE_PRESET = cfg('FFMPEG_TRANSCODE_PRESET', 'veryfast');
+let HLS_SEGMENT_SECONDS = parseInt(cfg('HLS_SEGMENT_SECONDS', '2'), 10);
+let HLS_LIST_SIZE = parseInt(cfg('HLS_LIST_SIZE', '4'), 10);
+
+let enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
+let enigmaAuth = ENIGMA2_USER
   ? { username: ENIGMA2_USER, password: ENIGMA2_PASSWORD }
   : null;
+
+let needsSetup = !fs.existsSync(CONFIG_PATH) && !process.env.ENIGMA2_HOST;
+
+function applyConfig() {
+  _savedConfig = null;
+  ENIGMA2_HOST = cfg('ENIGMA2_HOST', '192.168.1.100');
+  ENIGMA2_PORT = parseInt(cfg('ENIGMA2_PORT', '80'), 10);
+  ENIGMA2_STREAM_PORT = parseInt(cfg('ENIGMA2_STREAM_PORT', '8001'), 10);
+  ENIGMA2_USER = cfg('ENIGMA2_USER', '');
+  ENIGMA2_PASSWORD = cfg('ENIGMA2_PASSWORD', '');
+  ENIGMA2_SSH_PORT = parseInt(cfg('ENIGMA2_SSH_PORT', '22'), 10);
+  APP_USERNAME = cfg('APP_USERNAME', 'admin');
+  APP_PASSWORD = cfg('APP_PASSWORD', 'admin');
+  FFMPEG_FORCE_VIDEO_TRANSCODE = cfg('FFMPEG_FORCE_VIDEO_TRANSCODE', 'false').toLowerCase() === 'true';
+  FFMPEG_PROBESIZE = cfg('FFMPEG_PROBESIZE', '10000000');
+  FFMPEG_ANALYZEDURATION = cfg('FFMPEG_ANALYZEDURATION', '10000000');
+  FFMPEG_TRANSCODE_PRESET = cfg('FFMPEG_TRANSCODE_PRESET', 'veryfast');
+  HLS_SEGMENT_SECONDS = parseInt(cfg('HLS_SEGMENT_SECONDS', '2'), 10);
+  HLS_LIST_SIZE = parseInt(cfg('HLS_LIST_SIZE', '4'), 10);
+  enigmaBase = `http://${ENIGMA2_HOST}:${ENIGMA2_PORT}`;
+  enigmaAuth = ENIGMA2_USER ? { username: ENIGMA2_USER, password: ENIGMA2_PASSWORD } : null;
+  _piconDirCache = null;
+}
 
 // Use a persistent path inside the container (not /tmp which Docker may flush)
 const hlsRootDir = path.join(__dirname, '..', 'hls-sessions');
@@ -74,9 +117,84 @@ app.use(
   })
 );
 
+// ─── Setup routes ────────────────────────────────────────────────────────────
+
+app.get('/setup', (req, res) => {
+  if (!needsSetup) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'setup.html'));
+});
+
+app.get('/api/setup/status', (req, res) => {
+  res.json({ needsSetup });
+});
+
+app.get('/api/setup/defaults', (req, res) => {
+  if (!needsSetup) return res.status(403).json({ error: 'Already configured' });
+  const saved = loadSavedConfig();
+  res.json({
+    ENIGMA2_HOST:     saved.ENIGMA2_HOST     || '192.168.1.100',
+    ENIGMA2_PORT:     saved.ENIGMA2_PORT     || '80',
+    ENIGMA2_STREAM_PORT: saved.ENIGMA2_STREAM_PORT || '8001',
+    ENIGMA2_SSH_PORT: saved.ENIGMA2_SSH_PORT || '22',
+    ENIGMA2_USER:     saved.ENIGMA2_USER     || '',
+    ENIGMA2_PASSWORD: saved.ENIGMA2_PASSWORD || '',
+    APP_USERNAME:     saved.APP_USERNAME     || 'admin',
+    APP_PASSWORD:     saved.APP_PASSWORD     || '',
+    FFMPEG_FORCE_VIDEO_TRANSCODE: saved.FFMPEG_FORCE_VIDEO_TRANSCODE || 'false',
+    FFMPEG_PROBESIZE: saved.FFMPEG_PROBESIZE || '10000000',
+    FFMPEG_ANALYZEDURATION: saved.FFMPEG_ANALYZEDURATION || '10000000',
+    FFMPEG_TRANSCODE_PRESET: saved.FFMPEG_TRANSCODE_PRESET || 'veryfast',
+  });
+});
+
+app.post('/api/setup/save', (req, res) => {
+  if (!needsSetup) return res.status(403).json({ error: 'Already configured' });
+  const body = req.body || {};
+  const config = {};
+  const KEYS = [
+    'ENIGMA2_HOST', 'ENIGMA2_PORT', 'ENIGMA2_STREAM_PORT', 'ENIGMA2_SSH_PORT',
+    'ENIGMA2_USER', 'ENIGMA2_PASSWORD',
+    'APP_USERNAME', 'APP_PASSWORD',
+    'FFMPEG_FORCE_VIDEO_TRANSCODE', 'FFMPEG_PROBESIZE', 'FFMPEG_ANALYZEDURATION',
+    'FFMPEG_TRANSCODE_PRESET',
+  ];
+  for (const k of KEYS) {
+    if (body[k] !== undefined) config[k] = body[k];
+  }
+  if (!config.SESSION_SECRET) {
+    config.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
+  }
+  try {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to write config: ' + e.message });
+  }
+  needsSetup = false;
+  applyConfig();
+  console.log('[setup] Configuration saved, app is ready');
+  res.json({ ok: true });
+});
+
+app.post('/api/setup/test', async (req, res) => {
+  const { host, port, user, password } = req.body || {};
+  if (!host) return res.status(400).json({ error: 'Host required' });
+  try {
+    const url = `http://${host}:${port || 80}/api/about`;
+    const config = { timeout: 8000 };
+    if (user) config.auth = { username: user, password: password || '' };
+    const resp = await axios.get(url, config);
+    const info = resp.data?.info || {};
+    res.json({ ok: true, model: info.model || '', image: info.imagever || '' });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
 const requireAuth = (req, res, next) => {
+  if (needsSetup) return res.status(503).json({ error: 'Setup required' });
   if (req.session && req.session.authenticated) return next();
   res.status(401).json({ error: 'Unauthorized' });
 };
@@ -84,6 +202,7 @@ const requireAuth = (req, res, next) => {
 // ─── Auth routes ──────────────────────────────────────────────────────────────
 
 app.post('/auth/login', (req, res) => {
+  if (needsSetup) return res.status(503).json({ error: 'Setup required' });
   const { username, password } = req.body;
   if (username === APP_USERNAME && password === APP_PASSWORD) {
     req.session.authenticated = true;
@@ -1227,6 +1346,7 @@ app.get('/api/logs', requireAuth, (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
+  if (needsSetup && req.path !== '/setup') return res.redirect('/setup');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

@@ -136,6 +136,11 @@
   </div>
 
   <script>
+    // Redirect to setup if not yet configured
+    fetch('/api/setup/status').then(r => r.json()).then(d => {
+      if (d.needsSetup) window.location.href = '/setup';
+    }).catch(() => {});
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');
