@@ -1424,8 +1424,8 @@ async function resolveSptsUrl(sRef) {
   return null;
 }
 
-app.get('/stream/*', requireAuth, async (req, res) => {
-  const sRef = decodeURIComponent(req.params[0] || '');
+app.get('/stream', requireAuth, async (req, res) => {
+  const sRef = req.query.sRef || '';
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
   const isRec = isRecordingSRef(sRef);
@@ -1568,8 +1568,8 @@ app.get('/stream/*', requireAuth, async (req, res) => {
 let fmp4LastSettle = Promise.resolve();
 const activeFmp4Streams = new Map(); // sRef -> ChildProcess
 
-app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
-  const sRef = decodeURIComponent(req.params[0] || '');
+app.get('/stream-fmp4', requireAuth, async (req, res) => {
+  const sRef = req.query.sRef || '';
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
   // Insert ourselves into the settle chain.

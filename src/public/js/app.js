@@ -566,7 +566,7 @@
     let playStarted = false;
     (async () => {
       try {
-        const resp = await fetch(`/stream-fmp4/${encodeURIComponent(sRef)}`, {
+        const resp = await fetch(`/stream-fmp4?sRef=${encodeURIComponent(sRef)}`, {
           signal: fmp4Abort.signal,
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -697,7 +697,7 @@
       showVideoError('Stream cannot be played on this browser. Try Chrome or Firefox.');
       return;
     }
-    const streamUrl = `${window.location.origin}/stream/${encodeURIComponent(sRef)}`;
+    const streamUrl = `${window.location.origin}/stream?sRef=${encodeURIComponent(sRef)}`;
     player = mpegts.createPlayer({
       type: 'mpegts',
       url: streamUrl,
