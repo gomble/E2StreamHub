@@ -605,16 +605,7 @@
           // Start playback as soon as first data is buffered
           if (!playStarted && sb.buffered.length > 0) {
             playStarted = true;
-            videoEl.currentTime = sb.buffered.end(0);
             videoEl.play().catch(() => {});
-          }
-
-          // Chase live edge — if we fall behind, jump forward
-          if (sb.buffered.length > 0) {
-            const edge = sb.buffered.end(sb.buffered.length - 1);
-            if (edge - videoEl.currentTime > 4) {
-              videoEl.currentTime = edge - 0.5;
-            }
           }
         }
       } catch (err) {
