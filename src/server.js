@@ -1,12 +1,17 @@
 const express = require('express');
 const session = require('express-session');
+const compression = require('compression');
 const axios = require('axios');
+const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { Client: SshClient } = require('ssh2');
+
+// HTTP keep-alive agent so axios reuses connections to the receiver
+const _keepAliveAgent = new http.Agent({ keepAlive: true, maxSockets: 10, maxFreeSockets: 5 });
 
 const app = express();
 const PORT = process.env.PORT || 2000;
@@ -183,6 +188,7 @@ try {
   fs.mkdirSync(hlsRootDir, { recursive: true });
 } catch {}
 
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
@@ -404,10 +410,35 @@ app.post('/api/appsettings/2fa/disable', requireAuth, (req, res) => {
 // ─── Enigma2 proxy helper ─────────────────────────────────────────────────────
 
 async function enigmaGet(apiPath, params = {}) {
-  const config = { params, timeout: 15000 };
+  const config = { params, timeout: 15000, httpAgent: _keepAliveAgent };
   if (enigmaAuth) config.auth = enigmaAuth;
   const response = await axios.get(`${enigmaBase}${apiPath}`, config);
   return response.data;
+}
+
+// ─── Simple TTL cache for read-only Enigma2 API responses ────────────────────
+const _apiCache = new Map(); // key → { data, expiresAt }
+
+function cacheGet(key) {
+  const entry = _apiCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { _apiCache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key, data, ttlMs) {
+  _apiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+function cacheDel(prefix) {
+  for (const k of _apiCache.keys()) { if (k.startsWith(prefix)) _apiCache.delete(k); }
+}
+
+async function enigmaCached(apiPath, params = {}, ttlMs = 30000) {
+  const key = apiPath + JSON.stringify(params);
+  const hit = cacheGet(key);
+  if (hit) return hit;
+  const data = await enigmaGet(apiPath, params);
+  cacheSet(key, data, ttlMs);
+  return data;
 }
 
 // Extract the MPEG-TS program number from a service reference.
@@ -692,7 +723,7 @@ app.post('/api/picon/upload', requireAuth, express.json({ limit: '2mb' }), async
 
 app.get('/api/bouquets', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/bouquets');
+    const data = await enigmaCached('/api/bouquets', {}, 120000);
     res.json(data);
   } catch (err) {
     console.error('bouquets error:', err.message);
@@ -702,7 +733,7 @@ app.get('/api/bouquets', requireAuth, async (req, res) => {
 
 app.get('/api/services', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/getservices', { sRef: req.query.sRef });
+    const data = await enigmaCached('/api/getservices', { sRef: req.query.sRef }, 120000);
     res.json(data);
   } catch (err) {
     console.error('services error:', err.message);
@@ -712,7 +743,7 @@ app.get('/api/services', requireAuth, async (req, res) => {
 
 app.get('/api/epg', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/epgservice', { sRef: req.query.sRef });
+    const data = await enigmaCached('/api/epgservice', { sRef: req.query.sRef }, 30000);
     res.json(data);
   } catch (err) {
     console.error('epg error:', err.message);
@@ -722,7 +753,7 @@ app.get('/api/epg', requireAuth, async (req, res) => {
 
 app.get('/api/epgbouquet', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/epgbouquet', { bRef: req.query.bRef });
+    const data = await enigmaCached('/api/epgbouquet', { bRef: req.query.bRef }, 30000);
     res.json(data);
   } catch (err) {
     console.error('epgbouquet error:', err.message);
@@ -1078,7 +1109,7 @@ app.post('/api/createbouquet', requireAuth, async (req, res) => {
 
 app.get('/api/statusinfo', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/statusinfo');
+    const data = await enigmaCached('/api/statusinfo', {}, 10000);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });
@@ -1089,7 +1120,7 @@ app.get('/api/statusinfo', requireAuth, async (req, res) => {
 
 app.get('/api/about', requireAuth, async (req, res) => {
   try {
-    const data = await enigmaGet('/api/about');
+    const data = await enigmaCached('/api/about', {}, 300000);
     res.json(data);
   } catch (err) {
     res.status(502).json({ error: err.message });

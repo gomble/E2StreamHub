@@ -487,6 +487,7 @@ input { font-family: inherit; }
   background: rgba(0,0,0,.7);
   color: var(--text-dim);
   pointer-events: none;
+  will-change: opacity;
   transition: opacity .3s;
 }
 
@@ -566,6 +567,7 @@ input { font-family: inherit; }
   background: var(--accent);
   border-radius: 2px;
   transition: width 30s linear;
+  will-change: width;
 }
 
 /* ─── EPG Side Panel ───────────────────────────────────────────────────────── */
@@ -778,6 +780,7 @@ input { font-family: inherit; }
   position: relative;
   display: flex;
   flex-direction: column;
+  will-change: transform;
   width: 100%;
   margin-top: var(--topbar-h);
   background: var(--bg);
@@ -1079,6 +1082,7 @@ input { font-family: inherit; }
   transform: translateY(30px);
   transition: transform .2s;
   overflow: hidden;
+  will-change: transform;
 }
 .editor-overlay.open .editor-panel { transform: translateY(0); }
 
@@ -1384,6 +1388,7 @@ input { font-family: inherit; }
   transform: translateY(30px);
   transition: transform .2s;
   overflow: hidden;
+  will-change: transform;
 }
 .receiver-overlay.open .receiver-panel { transform: translateY(0); }
 
@@ -1920,6 +1925,7 @@ input { font-family: inherit; }
   transform: translateY(30px);
   transition: transform .2s;
   overflow: hidden;
+  will-change: transform;
 }
 .appsettings-overlay.open .appsettings-panel { transform: translateY(0); }
 

@@ -404,7 +404,7 @@
 
   document.getElementById('channelSearch').addEventListener('input', e => {
     clearTimeout(searchDebounce);
-    searchDebounce = setTimeout(() => runSearch(e.target.value), 250);
+    searchDebounce = setTimeout(() => runSearch(e.target.value), 400);
   });
 
   async function runSearch(term) {
@@ -516,8 +516,13 @@
     // Load EPG for visible channels in background to show "now playing" in list
     for (const svc of services) {
       try {
-        const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
-        const events = data.events || [];
+        if (!window._epgCache) window._epgCache = {};
+        let events = window._epgCache[svc.servicereference];
+        if (!events) {
+          const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(svc.servicereference)}`);
+          events = data.events || [];
+          window._epgCache[svc.servicereference] = events;
+        }
         const now = Date.now() / 1000;
         const current = events.find(e => e.begin_timestamp <= now && (e.begin_timestamp + e.duration_sec) > now);
         if (current) {
@@ -727,8 +732,9 @@
 
   // ─── Channel tuning & streaming ───────────────────────────────────────────
   async function tuneChannel(sRef, name, itemEl) {
-    // Mark active
-    document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+    // Mark active — remove from previous only, no full-DOM scan needed
+    const prev = channelList.querySelector('.channel-item.active');
+    if (prev && prev !== itemEl) prev.classList.remove('active');
     if (itemEl) itemEl.classList.add('active');
 
     currentSRef = sRef;
@@ -781,8 +787,13 @@
     nowPlaying.style.display = 'none';
 
     try {
-      const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(sRef)}`);
-      const events = data.events || [];
+      let events = window._epgCache?.[sRef];
+      if (!events) {
+        const data = await apiFetch(`/api/epg?sRef=${encodeURIComponent(sRef)}`);
+        events = data.events || [];
+        if (!window._epgCache) window._epgCache = {};
+        window._epgCache[sRef] = events;
+      }
 
       if (events.length === 0) {
         epgContent.innerHTML = '<div class="epg-empty">No EPG data available</div>';

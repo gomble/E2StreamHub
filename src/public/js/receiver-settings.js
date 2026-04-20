@@ -10,6 +10,7 @@
     overlay.setAttribute('aria-hidden', 'false');
     if (window._app?.updatePip) window._app.updatePip();
     loadAll();
+    clearInterval(signalTimer);
     signalTimer = setInterval(loadSignal, 5000);
   }
 
