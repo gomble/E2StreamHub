@@ -1145,7 +1145,7 @@
   });
 
   async function playRecording(movie) {
-    const sRef = movie.servicereference || '';
+    const filePath = movie.filename || '';
     const name = movie.eventname || movie.filename || '–';
     const svc = movie.servicename || '';
     const desc = movie.description || '';
@@ -1153,8 +1153,10 @@
     const len = movie.length || '';
     const size = movie.filesize ? formatRecBytes(movie.filesize) : '';
 
+    if (!filePath) return;
+
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
-    currentSRef = sRef;
+    currentSRef = filePath;
     currentChannelName = name;
 
     videoOverlay.classList.add('hidden');
@@ -1165,20 +1167,58 @@
     videoEl.onplaying = () => { bufferingSpinner.classList.remove('visible'); hideVideoError(); };
     videoEl.oncanplay = () => bufferingSpinner.classList.remove('visible');
 
+    // Use dedicated recording stream endpoint with file path
     if (fmp4Supported()) {
+      fmp4Abort = new AbortController();
+      const ms = new MediaSource();
+      videoEl.src = URL.createObjectURL(ms);
+      await new Promise((resolve, reject) => {
+        ms.addEventListener('sourceopen', resolve, { once: true });
+        ms.addEventListener('error', () => reject(new Error('MediaSource error')), { once: true });
+      });
+      let sb;
       try {
-        await startFmp4Playback(sRef, null);
-      } catch (err) {
-        console.warn('Recording fMP4 failed:', err.message);
-        tryMpegtsPlayback(sRef);
+        sb = ms.addSourceBuffer(FMP4_MIME);
+      } catch (e) {
+        console.warn('Recording SourceBuffer failed:', e.message);
+        return;
       }
+      const waitSb = () => sb.updating
+        ? new Promise(r => sb.addEventListener('updateend', r, { once: true }))
+        : Promise.resolve();
+
+      let playStarted = false;
+      (async () => {
+        try {
+          const resp = await fetch(`/stream-recording?file=${encodeURIComponent(filePath)}`, {
+            signal: fmp4Abort.signal,
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const reader = resp.body.getReader();
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            await waitSb();
+            if (sb.buffered.length > 0 && videoEl.currentTime > 20) {
+              const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 10);
+              if (trimTo > sb.buffered.start(0) + 1) {
+                sb.remove(sb.buffered.start(0), trimTo);
+                await waitSb();
+              }
+            }
+            try { sb.appendBuffer(value instanceof Uint8Array ? value.buffer : value); } catch {}
+            if (!playStarted && sb.buffered.length > 0) {
+              playStarted = true;
+              videoEl.play().catch(() => {});
+            }
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.error('Recording stream error:', err.message);
+        }
+      })();
     } else {
-      try {
-        await startHlsPlayback(sRef, null);
-      } catch (err) {
-        console.warn('Recording HLS failed:', err.message);
-        tryMpegtsPlayback(sRef);
-      }
+      showVideoError('Recordings require MSE support (Chrome/Firefox/Edge).');
     }
 
     nowPlaying.style.display = 'flex';

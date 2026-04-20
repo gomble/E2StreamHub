@@ -459,21 +459,7 @@ function isRecordingSRef(sRef) {
   return /:\/.+\.\w+$/.test(sRef);
 }
 
-function extractRecordingPath(sRef) {
-  const m = sRef.match(/:(\/.+)$/);
-  return m ? m[1] : null;
-}
-
 function buildSourceUrl(sRef) {
-  // Recordings: stream via OpenWebif /file endpoint on web port
-  const recPath = extractRecordingPath(sRef);
-  if (recPath) {
-    const authPart = ENIGMA2_USER && enigmaAuth
-      ? `${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@`
-      : '';
-    return `http://${authPart}${ENIGMA2_HOST}:${ENIGMA2_PORT}/file?file=${encodeURIComponent(recPath)}`;
-  }
-  // Live channels: Enigma2 streamserver on port 8001
   const encoded = sRef.replace(/ /g, '%20');
   if (ENIGMA2_STREAM_AUTH && ENIGMA2_USER) {
     return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${encoded}`;
@@ -1225,6 +1211,68 @@ app.get('/api/recordings', requireAuth, async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+// Stream a recording via fMP4 — takes the file path, not sRef
+app.get('/stream-recording', requireAuth, async (req, res) => {
+  const filePath = req.query.file || '';
+  if (!filePath) return res.status(400).json({ error: 'Missing file parameter' });
+
+  // Build the source URL: use OpenWebif /file endpoint to read the .ts file
+  const authPart = ENIGMA2_USER && enigmaAuth
+    ? `${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@`
+    : '';
+  const sourceUrl = `http://${authPart}${ENIGMA2_HOST}:${ENIGMA2_PORT}/file?file=${encodeURIComponent(filePath)}`;
+
+  console.log(`Recording stream: ${filePath}`);
+  console.log(`Recording source URL: ${sourceUrl}`);
+
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Cache-Control', 'no-cache, no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const ffArgs = [
+    '-hide_banner',
+    '-loglevel', 'warning',
+    '-fflags', '+genpts+discardcorrupt',
+    '-err_detect', 'ignore_err',
+    '-max_error_rate', '1.0',
+    '-probesize', FFMPEG_PROBESIZE,
+    '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-i', sourceUrl,
+    '-ignore_unknown',
+    '-map', '0:v:0?', '-map', '0:a:0?',
+    '-dn', '-sn',
+    '-c:v', 'libx264',
+    '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
+    '-tune', 'zerolatency',
+    '-profile:v', 'high', '-level:v', '4.0',
+    '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
+    '-c:a', 'aac', '-ac', '2', '-ar', '48000', '-b:a', '128k',
+    '-f', 'mp4',
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+    'pipe:1',
+  ];
+
+  const ff = spawn('ffmpeg', ffArgs);
+  ff.stdout.pipe(res);
+
+  let stderrBuf = '';
+  ff.stderr.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) { stderrBuf += msg + '\n'; console.error(`ffmpeg(rec): ${msg}`); }
+  });
+
+  ff.on('close', code => {
+    if (code && code !== 0 && !res.writableEnded) {
+      console.error(`ffmpeg(rec) exited ${code}`);
+    }
+    if (!res.writableEnded) res.end();
+  });
+
+  req.on('close', () => {
+    ff.kill('SIGTERM');
+  });
 });
 
 app.get('/api/current', requireAuth, async (req, res) => {
