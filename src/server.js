@@ -459,24 +459,17 @@ function isRecordingSRef(sRef) {
   return /:\/.+\.\w+$/.test(sRef);
 }
 
-function extractRecordingPath(sRef) {
-  const m = sRef.match(/:(\/.+\.\w+)$/);
-  return m ? m[1] : null;
+// Tell the receiver to start playing a recording, then stream it from port 8001
+async function startRecordingPlayback(sRef) {
+  await enigmaGet(`/api/movieplay?sRef=${encodeURIComponent(sRef)}`);
 }
 
 function buildSourceUrl(sRef) {
-  // Recordings: use OpenWebif file API to stream the .ts file directly
-  const recPath = extractRecordingPath(sRef);
-  if (recPath) {
-    const base = ENIGMA2_USER && enigmaAuth
-      ? `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_PORT}`
-      : `${enigmaBase}`;
-    return `${base}/file?file=${encodeURIComponent(recPath)}`;
-  }
+  const encoded = sRef.replace(/ /g, '%20');
   if (ENIGMA2_STREAM_AUTH && ENIGMA2_USER) {
-    return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+    return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${encoded}`;
   }
-  return `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+  return `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${encoded}`;
 }
 
 function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
@@ -1274,7 +1267,12 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
     const decodedSRef = decodeURIComponent(sRef);
-    const programNum = isRecordingSRef(decodedSRef) ? null : getProgramNumber(decodedSRef);
+    const isRec = isRecordingSRef(decodedSRef);
+    const programNum = isRec ? null : getProgramNumber(decodedSRef);
+    if (isRec) {
+      await startRecordingPlayback(decodedSRef);
+      await new Promise(r => setTimeout(r, 500));
+    }
     const sessionId = crypto.randomUUID();
     fs.mkdirSync(hlsRootDir, { recursive: true });
     const sessionDir = path.join(hlsRootDir, sessionId);
@@ -1436,6 +1434,8 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   let sourceUrl;
 
   if (isRec) {
+    await startRecordingPlayback(sRef);
+    await new Promise(r => setTimeout(r, 500));
     sourceUrl = buildSourceUrl(sRef);
   } else {
     const iptvUrl = extractIptvUrl(sRef);
@@ -1613,6 +1613,8 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
     if (iptvUrl) {
       sourceUrl = iptvUrl;
     } else if (isRecording) {
+      await startRecordingPlayback(sRef);
+      await new Promise(r => setTimeout(r, 500));
       sourceUrl = buildSourceUrl(sRef);
     } else {
       const sptsUrl = await resolveSptsUrl(sRef);
