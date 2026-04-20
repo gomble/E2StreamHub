@@ -455,9 +455,24 @@ function touchHlsSession(sessionId) {
   } catch {}
 }
 
+function isRecordingSRef(sRef) {
+  return /:\/.+\.\w+$/.test(sRef);
+}
+
+function extractRecordingPath(sRef) {
+  const m = sRef.match(/:(\/.+\.\w+)$/);
+  return m ? m[1] : null;
+}
+
 function buildSourceUrl(sRef) {
-  // Most Enigma2 boxes: port 8001 needs no auth.
-  // Gigablue boxes: stream port requires HTTP basic auth — enable via ENIGMA2_STREAM_AUTH.
+  // Recordings: use OpenWebif file API to stream the .ts file directly
+  const recPath = extractRecordingPath(sRef);
+  if (recPath) {
+    const base = ENIGMA2_USER && enigmaAuth
+      ? `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_PORT}`
+      : `${enigmaBase}`;
+    return `${base}/file?file=${encodeURIComponent(recPath)}`;
+  }
   if (ENIGMA2_STREAM_AUTH && ENIGMA2_USER) {
     return `http://${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
   }
@@ -566,12 +581,33 @@ app.get('/picon/:sref', requireAuth, async (req, res) => {
     res.set('Cache-Control', 'public, max-age=86400');
     response.data.pipe(res);
   } catch {
-    // Cache miss so we don't hammer the receiver for the same sRef repeatedly
+    // Fallback: try reading the picon from the detected picon directory via file API
     try {
       const raw = decodeURIComponent(req.params.sref);
-      _piconMissing.add(raw.split('::')[0].replace(/:+$/, ''));
-    } catch { /* ignore */ }
-    sendEmpty();
+      const parts = raw.split(':');
+      const firstType = parseInt(parts[0], 10);
+      let sRefOnly;
+      if (firstType === 5001 || firstType === 5002) {
+        sRefOnly = parts.slice(0, 10).join(':');
+      } else {
+        sRefOnly = raw.split('::')[0].replace(/:+$/, '');
+      }
+      const piconDir = await detectPiconDir();
+      const filename = sRefToPiconName(sRefOnly) + '.png';
+      const remotePath = `${piconDir.replace(/\/$/, '')}/${filename}`;
+      const fileConfig = { params: { file: remotePath }, responseType: 'stream', timeout: 5000 };
+      if (enigmaAuth) fileConfig.auth = enigmaAuth;
+      const fileRes = await axios.get(`${enigmaBase}/file`, fileConfig);
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      fileRes.data.pipe(res);
+    } catch {
+      try {
+        const raw = decodeURIComponent(req.params.sref);
+        _piconMissing.add(raw.split('::')[0].replace(/:+$/, ''));
+      } catch { /* ignore */ }
+      sendEmpty();
+    }
   }
 });
 
@@ -1238,9 +1274,8 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
     const decodedSRef = decodeURIComponent(sRef);
-    const programNum = getProgramNumber(decodedSRef);
+    const programNum = isRecordingSRef(decodedSRef) ? null : getProgramNumber(decodedSRef);
     const sessionId = crypto.randomUUID();
-    // Re-create root in case the OS flushed /tmp between container restarts
     fs.mkdirSync(hlsRootDir, { recursive: true });
     const sessionDir = path.join(hlsRootDir, sessionId);
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -1390,49 +1425,53 @@ app.get('/stream/*', requireAuth, async (req, res) => {
   const sRef = decodeURIComponent(req.params[0] || '');
   if (!sRef) return res.status(400).json({ error: 'Missing service reference' });
 
-  const programNum = getProgramNumber(sRef);
-  console.log(`Stream request: ${sRef}  program=${programNum}`);
+  const isRec = isRecordingSRef(sRef);
+  const programNum = isRec ? null : getProgramNumber(sRef);
+  console.log(`Stream request: ${sRef}  recording=${isRec}  program=${programNum}`);
 
   res.setHeader('Content-Type', 'video/mp2t');
   res.setHeader('Cache-Control', 'no-cache, no-store');
   res.setHeader('X-Accel-Buffering', 'no');
 
-  // For IPTV sRefs the URL is embedded — skip the receiver lookup entirely
-  const iptvUrl = extractIptvUrl(sRef);
-  const sptsUrl = iptvUrl || await resolveSptsUrl(sRef);
+  let sourceUrl;
 
-  let canDirectRelay = false;
-  if (sptsUrl) {
-    try {
-      const parsed = new URL(sptsUrl);
-      const relayPort = parseInt(parsed.port || '80', 10);
-      canDirectRelay = relayPort !== ENIGMA2_STREAM_PORT;
-      if (!canDirectRelay) {
-        console.log(`Skipping direct relay for port ${relayPort}; using ffmpeg program mapping`);
+  if (isRec) {
+    sourceUrl = buildSourceUrl(sRef);
+  } else {
+    const iptvUrl = extractIptvUrl(sRef);
+    const sptsUrl = iptvUrl || await resolveSptsUrl(sRef);
+
+    let canDirectRelay = false;
+    if (sptsUrl) {
+      try {
+        const parsed = new URL(sptsUrl);
+        const relayPort = parseInt(parsed.port || '80', 10);
+        canDirectRelay = relayPort !== ENIGMA2_STREAM_PORT;
+        if (!canDirectRelay) {
+          console.log(`Skipping direct relay for port ${relayPort}; using ffmpeg program mapping`);
+        }
+      } catch {
+        canDirectRelay = false;
       }
-    } catch {
-      canDirectRelay = false;
     }
-  }
 
-  if (sptsUrl && canDirectRelay) {
-    try {
-      const axiosConfig = { responseType: 'stream', timeout: 10000 };
-      if (enigmaAuth) axiosConfig.auth = enigmaAuth;
-      const upstream = await axios.get(sptsUrl, axiosConfig);
-      console.log(`Proxying SPTS from ${sptsUrl}  HTTP ${upstream.status}`);
-      upstream.data.pipe(res);
-      upstream.data.on('error', () => { if (!res.writableEnded) res.end(); });
-      req.on('close', () => upstream.data.destroy());
-      return;
-    } catch (e) {
-      console.warn('SPTS proxy failed, falling back to ffmpeg:', e.message);
+    if (sptsUrl && canDirectRelay) {
+      try {
+        const axiosConfig = { responseType: 'stream', timeout: 10000 };
+        if (enigmaAuth) axiosConfig.auth = enigmaAuth;
+        const upstream = await axios.get(sptsUrl, axiosConfig);
+        console.log(`Proxying SPTS from ${sptsUrl}  HTTP ${upstream.status}`);
+        upstream.data.pipe(res);
+        upstream.data.on('error', () => { if (!res.writableEnded) res.end(); });
+        req.on('close', () => upstream.data.destroy());
+        return;
+      } catch (e) {
+        console.warn('SPTS proxy failed, falling back to ffmpeg:', e.message);
+      }
     }
-  }
 
-  // ── Strategy 2: ffmpeg extracts the program from the MPTS on port 8001 ──────
-  // Port 8001 (streaming) does not use HTTP auth — credentials not needed.
-  const sourceUrl = `http://${ENIGMA2_HOST}:${ENIGMA2_STREAM_PORT}/${sRef}`;
+    sourceUrl = buildSourceUrl(sRef);
+  }
 
   console.log(`ffmpeg fallback: ${sourceUrl}  program=${programNum}`);
 
@@ -1560,11 +1599,10 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   // Give the receiver time to close its HTTP connection before we reconnect.
   if (killed) await new Promise(r => setTimeout(r, 300));
 
-  // For IPTV sRefs the program number from the sRef is the Enigma2 service ID,
-  // not the MPEG-TS program number in the IPTV stream — don't use it.
+  const isRecording = isRecordingSRef(sRef);
   const iptvUrl = extractIptvUrl(sRef);
-  const programNum = iptvUrl ? null : getProgramNumber(sRef);
-  console.log(`fMP4 stream: ${sRef}  program=${programNum}`);
+  const programNum = (iptvUrl || isRecording) ? null : getProgramNumber(sRef);
+  console.log(`fMP4 stream: ${sRef}  recording=${isRecording}  program=${programNum}`);
 
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Cache-Control', 'no-cache, no-store');
@@ -1573,10 +1611,10 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   let sourceUrl;
   try {
     if (iptvUrl) {
-      // IPTV channel: URL is embedded in sRef — use it directly, skip receiver lookup
       sourceUrl = iptvUrl;
+    } else if (isRecording) {
+      sourceUrl = buildSourceUrl(sRef);
     } else {
-      // Prefer the single-program URL from OpenWebif if on a dedicated port
       const sptsUrl = await resolveSptsUrl(sRef);
       sourceUrl = buildSourceUrl(sRef);
       if (sptsUrl) {
@@ -1596,16 +1634,14 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    '-fflags', '+nobuffer+genpts+discardcorrupt',
-    '-flags', 'low_delay',
+    '-fflags', '+genpts+discardcorrupt' + (isRecording ? '' : '+nobuffer'),
     '-err_detect', 'ignore_err',
     '-max_error_rate', '1.0',
-    '-probesize', '500000',
-    '-analyzeduration', '500000',
-    '-thread_queue_size', '512',
-    '-i', sourceUrl,
-    '-ignore_unknown',
+    '-probesize', isRecording ? FFMPEG_PROBESIZE : '500000',
+    '-analyzeduration', isRecording ? FFMPEG_ANALYZEDURATION : '500000',
   ];
+  if (!isRecording) ffArgs.push('-flags', 'low_delay', '-thread_queue_size', '512');
+  ffArgs.push('-i', sourceUrl, '-ignore_unknown');
 
   if (programNum) {
     ffArgs.push('-map', `0:p:${programNum}:v:0?`);
