@@ -1213,54 +1213,19 @@ app.get('/api/recordings', requireAuth, async (req, res) => {
   }
 });
 
-// Get recording duration via ffprobe
-app.get('/api/recording-duration', requireAuth, async (req, res) => {
-  const filePath = req.query.file || '';
-  if (!filePath) return res.status(400).json({ error: 'Missing file parameter' });
-
-  const authPart = ENIGMA2_USER && enigmaAuth
-    ? `${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@`
-    : '';
-  const sourceUrl = `http://${authPart}${ENIGMA2_HOST}:${ENIGMA2_PORT}/file?file=${encodeURIComponent(filePath)}`;
-
-  try {
-    const result = await new Promise((resolve, reject) => {
-      const args = [
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'json',
-        sourceUrl,
-      ];
-      const proc = spawn('ffprobe', args);
-      let out = '';
-      proc.stdout.on('data', d => { out += d; });
-      proc.stderr.on('data', () => {});
-      proc.on('close', code => {
-        if (code !== 0) return reject(new Error(`ffprobe exit ${code}`));
-        try {
-          const data = JSON.parse(out);
-          resolve(parseFloat(data.format?.duration || '0'));
-        } catch (e) { reject(e); }
-      });
-    });
-    res.json({ duration: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Stream a recording via fMP4 — takes the file path and optional start time
+// Stream a recording via fMP4 — takes the file path, not sRef
 app.get('/stream-recording', requireAuth, async (req, res) => {
   const filePath = req.query.file || '';
   if (!filePath) return res.status(400).json({ error: 'Missing file parameter' });
-  const startSec = parseFloat(req.query.start || '0') || 0;
 
+  // Build the source URL: use OpenWebif /file endpoint to read the .ts file
   const authPart = ENIGMA2_USER && enigmaAuth
     ? `${encodeURIComponent(ENIGMA2_USER)}:${encodeURIComponent(ENIGMA2_PASSWORD)}@`
     : '';
   const sourceUrl = `http://${authPart}${ENIGMA2_HOST}:${ENIGMA2_PORT}/file?file=${encodeURIComponent(filePath)}`;
 
-  console.log(`Recording stream: ${filePath} start=${startSec}s`);
+  console.log(`Recording stream: ${filePath}`);
+  console.log(`Recording source URL: ${sourceUrl}`);
 
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Cache-Control', 'no-cache, no-store');
@@ -1269,9 +1234,6 @@ app.get('/stream-recording', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-  ];
-  if (startSec > 0) ffArgs.push('-ss', String(startSec));
-  ffArgs.push(
     '-fflags', '+genpts+discardcorrupt',
     '-err_detect', 'ignore_err',
     '-max_error_rate', '1.0',
@@ -1290,14 +1252,15 @@ app.get('/stream-recording', requireAuth, async (req, res) => {
     '-f', 'mp4',
     '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
     'pipe:1',
-  );
+  ];
 
   const ff = spawn('ffmpeg', ffArgs);
   ff.stdout.pipe(res);
 
+  let stderrBuf = '';
   ff.stderr.on('data', d => {
     const msg = d.toString().trim();
-    if (msg) console.error(`ffmpeg(rec): ${msg}`);
+    if (msg) { stderrBuf += msg + '\n'; console.error(`ffmpeg(rec): ${msg}`); }
   });
 
   ff.on('close', code => {
