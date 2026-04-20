@@ -16,7 +16,8 @@ const logClients = new Set();
 
 function broadcastLog(level, args) {
   const d = new Date();
-  const ts = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  const localMs = d.getTime() - d.getTimezoneOffset() * 60000;
+  const ts = new Date(localMs).toISOString().slice(0, 19);
   const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
   const payload = JSON.stringify({ ts, level, msg });
   for (const res of logClients) {
@@ -555,7 +556,7 @@ app.get('/picon/:sref', requireAuth, async (req, res) => {
     // Skip sRefs we already know are missing
     if (_piconMissing.has(sRefOnly)) return sendEmpty();
 
-    const name = sRefOnly.replace(/:/g, '_');
+    const name = sRefToPiconName(sRefOnly);
     const url  = `${enigmaBase}/picon/${name}.png`;
     const config = { responseType: 'stream', timeout: 5000 };
     if (enigmaAuth) config.auth = enigmaAuth;
@@ -588,9 +589,12 @@ const KNOWN_PICON_DIRS = [
   '/tmp/picons',
 ];
 
-// Convert sRef to picon filename: "1:0:1:ABC:1:2:3:0:0:0:" → "1_0_1_ABC_1_2_3_0_0_0"
+// Convert sRef to picon filename matching Enigma2/PiconManager convention
+// "1:0:1:d72a:1EC0:..." → "1_0_1_D72A_1EC0_0_0_0_0_0"
 function sRefToPiconName(sRef) {
-  return String(sRef).replace(/:+$/, '').replace(/:/g, '_');
+  const parts = String(sRef).replace(/:+$/, '').split(':');
+  while (parts.length < 10) parts.push('0');
+  return parts.slice(0, 10).map(p => /^[0-9a-fA-F]+$/.test(p) ? p.toUpperCase() : p).join('_');
 }
 
 // Auto-detect the best picon directory and cache the result
@@ -602,7 +606,7 @@ async function detectPiconDir() {
   // 1. Try Enigma2 settings file for a configured path
   try {
     const settings = await enigmaReadFile('/etc/enigma2/settings');
-    const m = settings.match(/config\.(?:DreamPlex\.piconpath|plugins\.piconcockpit\.iconpath)\s*=\s*(.+)/);
+    const m = settings.match(/config\.(?:DreamPlex\.piconpath|plugins\.piconcockpit\.iconpath|plugins\.piconmanager\.savetopath)\s*=\s*(.+)/);
     if (m) {
       const p = m[1].trim();
       if (p) { _piconDirCache = p; return p; }
@@ -841,11 +845,15 @@ async function sshWriteFile(remotePath, content) {
   return new Promise((resolve, reject) => {
     conn.sftp((err, sftp) => {
       if (err) { conn.end(); return reject(err); }
-      const buf    = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
-      const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
-      stream.on('error', e  => { conn.end(); reject(e); });
-      stream.on('close', () => { conn.end(); resolve(); });
-      stream.end(buf);
+      const dir = remotePath.substring(0, remotePath.lastIndexOf('/'));
+      sftp.mkdir(dir, (mkdirErr) => {
+        // Ignore EEXIST (dir already exists), fail on other errors only if write fails
+        const buf    = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+        const stream = sftp.createWriteStream(remotePath, { flags: 'w' });
+        stream.on('error', e  => { conn.end(); reject(e); });
+        stream.on('close', () => { conn.end(); resolve(); });
+        stream.end(buf);
+      });
     });
   });
 }
