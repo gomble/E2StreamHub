@@ -1465,13 +1465,16 @@ app.get('/hls/:sessionId/:file', requireAuth, (req, res) => {
 // sRef format: "5002:0:1:0:SID:TID:0:0:0:0:http://host/path:Channel Name"
 // Split on ':' gives [..., 'http', '//host/path', 'Channel Name']
 // so the URL is parts[10] + ':' + parts[11].
+// The scheme may also be percent-encoded as 'http%3a' or 'https%3a'.
 function extractIptvUrl(sRef) {
   const parts = sRef.split(':');
   const type = parseInt(parts[0], 10);
   if (type !== 5001 && type !== 5002) return null;
-  if (parts.length > 11 && (parts[10] === 'http' || parts[10] === 'https')) {
-    // parts[11] is "//host/path" — rejoin with the scheme
-    return parts[10] + ':' + parts[11];
+  if (parts.length > 11) {
+    const scheme = decodeURIComponent(parts[10]).toLowerCase();
+    if (scheme === 'http' || scheme === 'https') {
+      return scheme + ':' + parts[11];
+    }
   }
   return null;
 }
@@ -1485,9 +1488,9 @@ async function resolveSptsUrl(sRef) {
     for (const line of m3u.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        // Receiver sometimes appends ":Channel Name" after the URL — strip it.
-        // Match up to the first colon that comes AFTER the path (not after http:)
-        const rawUrl = trimmed.replace(/^(https?:\/\/[^/]+\/[^\s]*).*$/, '$1');
+        // Receiver appends ":Channel Name" after the stream URL.
+        // Keep only up to the last known stream extension (.ts, .m3u8, etc.).
+        const rawUrl = trimmed.replace(/^(https?:\/\/\S+?\.(ts|m3u8|mp4|mkv|avi)).*$/i, '$1');
         const url = new URL(rawUrl);
         const port = url.port || '80';
         const resolved = `http://${ENIGMA2_HOST}:${port}${url.pathname}`;
