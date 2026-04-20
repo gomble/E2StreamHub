@@ -311,44 +311,88 @@
       <!-- Remote Control -->
       <section class="rcv-section">
         <h3 class="rcv-section-title">Fernbedienung</h3>
-        <div class="rcv-remote-grid" id="rcvRemoteGrid">
-          <button class="rcv-rc-btn" data-rc="116" title="Power">⏻</button>
-          <button class="rcv-rc-btn" data-rc="174" title="Mute">🔇</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="2">1</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="3">2</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="4">3</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="5">4</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="6">5</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="7">6</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="8">7</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="9">8</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="10">9</button>
-          <button class="rcv-rc-btn" data-rc="412" title="Zurück">◀◀</button>
-          <button class="rcv-rc-btn rcv-rc-num" data-rc="11">0</button>
-          <button class="rcv-rc-btn" data-rc="407" title="Vorwärts">▶▶</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="115">Vol +</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="103">▲</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="402">CH +</button>
-          <button class="rcv-rc-btn" data-rc="105">◀</button>
-          <button class="rcv-rc-btn rcv-rc-ok" data-rc="352">OK</button>
-          <button class="rcv-rc-btn" data-rc="106">▶</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="114">Vol −</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="108">▼</button>
-          <button class="rcv-rc-btn rcv-rc-wide" data-rc="403">CH −</button>
-          <button class="rcv-rc-btn" data-rc="358" title="Info">ℹ</button>
-          <button class="rcv-rc-btn" data-rc="139" title="Menü">☰</button>
-          <button class="rcv-rc-btn" data-rc="392" title="Audio">🔊</button>
-          <button class="rcv-rc-btn rcv-rc-color rcv-rc-red" data-rc="398">Red</button>
-          <button class="rcv-rc-btn rcv-rc-color rcv-rc-green" data-rc="399">Green</button>
-          <button class="rcv-rc-btn rcv-rc-color rcv-rc-yellow" data-rc="400">Yellow</button>
-          <button class="rcv-rc-btn rcv-rc-color rcv-rc-blue" data-rc="401">Blue</button>
-          <button class="rcv-rc-btn" data-rc="377" title="Play">▶</button>
-          <button class="rcv-rc-btn" data-rc="119" title="Pause">⏸</button>
-          <button class="rcv-rc-btn" data-rc="128" title="Stop">⏹</button>
-          <button class="rcv-rc-btn" data-rc="167" title="Record">⏺</button>
-          <button class="rcv-rc-btn" data-rc="174" title="Subtitle">SUB</button>
-          <button class="rcv-rc-btn" data-rc="385" title="EPG">EPG</button>
-          <button class="rcv-rc-btn" data-rc="388" title="Exit/Back">EXIT</button>
+        <div class="rcv-remote-wrap">
+          <div class="rcv-remote">
+            <!-- Power / Mute -->
+            <div class="rcv-rc-row" style="justify-content:space-between;padding:0 16px">
+              <button class="rcv-rc-btn rcv-rc-power" data-rc="116" title="Power">⏻</button>
+              <button class="rcv-rc-btn rcv-rc-mute" data-rc="174" title="Mute">🔇</button>
+            </div>
+
+            <div class="rcv-rc-separator"></div>
+
+            <!-- Number pad -->
+            <div class="rcv-rc-numpad">
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="2">1</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="3">2</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="4">3</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="5">4</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="6">5</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="7">6</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="8">7</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="9">8</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="10">9</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="412">REV</button>
+              <button class="rcv-rc-btn rcv-rc-num" data-rc="11">0</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="407">FWD</button>
+            </div>
+
+            <div class="rcv-rc-separator"></div>
+
+            <!-- Nav area: Vol | D-Pad | Ch -->
+            <div class="rcv-rc-nav-area">
+              <div class="rcv-rc-side-col">
+                <span class="rcv-rc-side-label">Vol</span>
+                <button class="rcv-rc-btn rcv-rc-side-btn" data-rc="115">+</button>
+                <button class="rcv-rc-btn rcv-rc-side-btn" data-rc="114">−</button>
+              </div>
+              <div class="rcv-rc-dpad">
+                <div class="rcv-rc-dpad-ring"></div>
+                <button class="rcv-rc-btn rcv-rc-dpad-up" data-rc="103">▲</button>
+                <button class="rcv-rc-btn rcv-rc-dpad-down" data-rc="108">▼</button>
+                <button class="rcv-rc-btn rcv-rc-dpad-left" data-rc="105">◀</button>
+                <button class="rcv-rc-btn rcv-rc-dpad-right" data-rc="106">▶</button>
+                <button class="rcv-rc-btn rcv-rc-ok" data-rc="352">OK</button>
+              </div>
+              <div class="rcv-rc-side-col">
+                <span class="rcv-rc-side-label">CH</span>
+                <button class="rcv-rc-btn rcv-rc-side-btn" data-rc="402">+</button>
+                <button class="rcv-rc-btn rcv-rc-side-btn" data-rc="403">−</button>
+              </div>
+            </div>
+
+            <!-- Info / Menu / Exit row -->
+            <div class="rcv-rc-row">
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="358">INFO</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="139">MENU</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="388">EXIT</button>
+            </div>
+
+            <!-- Color buttons -->
+            <div class="rcv-rc-colors">
+              <button class="rcv-rc-color rcv-rc-red" data-rc="398">&nbsp;</button>
+              <button class="rcv-rc-color rcv-rc-green" data-rc="399">&nbsp;</button>
+              <button class="rcv-rc-color rcv-rc-yellow" data-rc="400">&nbsp;</button>
+              <button class="rcv-rc-color rcv-rc-blue" data-rc="401">&nbsp;</button>
+            </div>
+
+            <div class="rcv-rc-separator"></div>
+
+            <!-- Media controls -->
+            <div class="rcv-rc-row">
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="377">▶</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="119">⏸</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="128">⏹</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="167" style="color:var(--accent)">⏺</button>
+            </div>
+
+            <!-- Bottom function row -->
+            <div class="rcv-rc-row">
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="392">AUDIO</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="370">SUB</button>
+              <button class="rcv-rc-btn rcv-rc-func" data-rc="385">EPG</button>
+            </div>
+          </div>
         </div>
       </section>
 
