@@ -1515,6 +1515,140 @@ input { font-family: inherit; }
 .rcv-timer-running { background: var(--accent-dim); color: var(--accent); }
 .rcv-timer-done { background: rgba(34,197,94,.15); color: #22c55e; }
 
+.rcv-timer-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rcv-timer-btns {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.rcv-timer-toggle, .rcv-timer-del {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.rcv-timer-toggle:hover { border-color: var(--accent); color: var(--text); }
+.rcv-timer-del:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Sleep timer */
+.rcv-sleep-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.rcv-sleep-status {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Remote control grid */
+.rcv-remote-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-width: 340px;
+}
+.rcv-rc-btn {
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 6px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  text-align: center;
+}
+.rcv-rc-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+.rcv-rc-btn:active { background: var(--accent); color: #fff; }
+.rcv-rc-num { font-size: 16px; }
+.rcv-rc-ok {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.rcv-rc-ok:hover { opacity: .85; }
+.rcv-rc-wide { font-size: 11px; }
+.rcv-rc-color { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.rcv-rc-red { background: #c0392b; border-color: #c0392b; color: #fff; }
+.rcv-rc-green { background: #27ae60; border-color: #27ae60; color: #fff; }
+.rcv-rc-yellow { background: #f39c12; border-color: #f39c12; color: #000; }
+.rcv-rc-blue { background: #2980b9; border-color: #2980b9; color: #fff; }
+.rcv-rc-red:hover, .rcv-rc-green:hover, .rcv-rc-yellow:hover, .rcv-rc-blue:hover { opacity: .8; }
+
+/* Recordings list */
+.rcv-rec-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rcv-rec-item:last-child { border-bottom: none; }
+.rcv-rec-info { flex: 1; min-width: 0; }
+.rcv-rec-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcv-rec-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.rcv-rec-size {
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* Settings list */
+.rcv-settings-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.rcv-settings-filter {
+  margin-bottom: 10px;
+}
+.rcv-setting-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rcv-setting-item:last-child { border-bottom: none; }
+.rcv-setting-key {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  min-width: 200px;
+  flex-shrink: 0;
+  word-break: break-all;
+}
+.rcv-setting-val {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ─── Picture-in-Picture ──────────────────────────────────────────────────── */
 .pip-window {
   display: none;

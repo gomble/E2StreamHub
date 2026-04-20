@@ -15,7 +15,8 @@ const PORT = process.env.PORT || 2000;
 const logClients = new Set();
 
 function broadcastLog(level, args) {
-  const ts = new Date().toISOString();
+  const d = new Date();
+  const ts = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
   const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
   const payload = JSON.stringify({ ts, level, msg });
   for (const res of logClients) {
@@ -951,6 +952,96 @@ app.get('/api/remotecontrol', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/getallservices', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/getallservices');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/timerdelete', requireAuth, async (req, res) => {
+  try {
+    const { sRef, begin, end } = req.query;
+    const data = await enigmaGet('/api/timerdelete', { sRef, begin, end });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/timertoggle', requireAuth, async (req, res) => {
+  try {
+    const { sRef, begin, end } = req.query;
+    const data = await enigmaGet('/api/timertoggle', { sRef, begin, end });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/timercleanup', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/timercleanup');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/recordings', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/movielist');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/current', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/subservices');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/sleeptimer', requireAuth, async (req, res) => {
+  try {
+    const params = {};
+    if (req.query.cmd !== undefined) params.cmd = req.query.cmd;
+    if (req.query.time !== undefined) params.time = req.query.time;
+    if (req.query.action !== undefined) params.action = req.query.action;
+    if (req.query.enabled !== undefined) params.enabled = req.query.enabled;
+    const data = await enigmaGet('/api/sleeptimer', params);
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/settings', requireAuth, async (req, res) => {
+  try {
+    const data = await enigmaGet('/api/settings');
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get('/api/setsetting', requireAuth, async (req, res) => {
+  try {
+    const { key, value } = req.query;
+    if (!key) return res.status(400).json({ error: 'Missing key' });
+    const data = await enigmaGet('/api/setsetting', { key, value });
+    res.json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.post('/hls/start', requireAuth, async (req, res) => {
   try {
     const sRef = String(req.body?.sRef || '');
@@ -1277,7 +1368,7 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
     killed = true;
   }
   // Give the receiver time to close its HTTP connection before we reconnect.
-  if (killed) await new Promise(r => setTimeout(r, 700));
+  if (killed) await new Promise(r => setTimeout(r, 300));
 
   // For IPTV sRefs the program number from the sRef is the Enigma2 service ID,
   // not the MPEG-TS program number in the IPTV stream — don't use it.
@@ -1315,15 +1406,12 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
   const ffArgs = [
     '-hide_banner',
     '-loglevel', 'warning',
-    // Low probesize/analyzeduration for fast startup on live MPEG-TS streams.
-    // The source format is well-known; deep analysis only adds latency.
     '-fflags', '+nobuffer+genpts+discardcorrupt',
+    '-flags', 'low_delay',
     '-err_detect', 'ignore_err',
     '-max_error_rate', '1.0',
-    '-probesize', '1000000',
-    '-analyzeduration', '1000000',
-    // Large thread queue reduces "no frame!" / "non-existing SPS" stalls
-    // that occur when the demuxer produces frames faster than the decoder.
+    '-probesize', '500000',
+    '-analyzeduration', '500000',
     '-thread_queue_size', '512',
     '-i', sourceUrl,
     '-ignore_unknown',
@@ -1364,7 +1452,7 @@ app.get('/stream-fmp4/*', requireAuth, async (req, res) => {
     }
 
     if (attempt > 0) {
-      const delay = attempt * 800; // 800, 1600, 2400, 3200 ms
+      const delay = attempt * 500; // 500, 1000, 1500, 2000 ms
       console.log(`fMP4 retry ${attempt}/${MAX_RETRIES} for ${sRef} after ${delay}ms`);
       await new Promise(r => setTimeout(r, delay));
       if (clientGone || res.writableEnded) break;

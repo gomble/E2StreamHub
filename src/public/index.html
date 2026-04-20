@@ -242,9 +242,12 @@
           <div class="rcv-info-item"><span class="rcv-label">Image</span><span class="rcv-value" id="rcvImage">–</span></div>
           <div class="rcv-info-item"><span class="rcv-label">Enigma2</span><span class="rcv-value" id="rcvEnigmaVer">–</span></div>
           <div class="rcv-info-item"><span class="rcv-label">OpenWebif</span><span class="rcv-value" id="rcvWebifVer">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Kernel</span><span class="rcv-value" id="rcvKernel">–</span></div>
           <div class="rcv-info-item"><span class="rcv-label">Uptime</span><span class="rcv-value" id="rcvUptime">–</span></div>
           <div class="rcv-info-item"><span class="rcv-label">Tuner</span><span class="rcv-value" id="rcvTuners">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Netzwerk</span><span class="rcv-value" id="rcvNetwork">–</span></div>
           <div class="rcv-info-item"><span class="rcv-label">HDD</span><span class="rcv-value" id="rcvHdd">–</span></div>
+          <div class="rcv-info-item"><span class="rcv-label">Aktueller Kanal</span><span class="rcv-value" id="rcvCurrentCh">–</span></div>
         </div>
       </section>
 
@@ -283,6 +286,72 @@
         </div>
       </section>
 
+      <!-- Sleep Timer -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Sleep Timer</h3>
+        <div class="rcv-sleep-row">
+          <select class="bouquet-select" id="rcvSleepTime" style="width:auto">
+            <option value="15">15 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+            <option value="120">120 min</option>
+          </select>
+          <select class="bouquet-select" id="rcvSleepAction" style="width:auto">
+            <option value="standby">Standby</option>
+            <option value="shutdown">Deep Standby</option>
+          </select>
+          <button class="btn-secondary" id="rcvSleepSet">Aktivieren</button>
+          <button class="btn-secondary" id="rcvSleepOff">Deaktivieren</button>
+          <span class="rcv-sleep-status" id="rcvSleepStatus"></span>
+        </div>
+      </section>
+
+      <!-- Remote Control -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Fernbedienung</h3>
+        <div class="rcv-remote-grid" id="rcvRemoteGrid">
+          <button class="rcv-rc-btn" data-rc="116" title="Power">⏻</button>
+          <button class="rcv-rc-btn" data-rc="174" title="Mute">🔇</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="2">1</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="3">2</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="4">3</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="5">4</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="6">5</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="7">6</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="8">7</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="9">8</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="10">9</button>
+          <button class="rcv-rc-btn" data-rc="412" title="Zurück">◀◀</button>
+          <button class="rcv-rc-btn rcv-rc-num" data-rc="11">0</button>
+          <button class="rcv-rc-btn" data-rc="407" title="Vorwärts">▶▶</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="115">Vol +</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="103">▲</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="402">CH +</button>
+          <button class="rcv-rc-btn" data-rc="105">◀</button>
+          <button class="rcv-rc-btn rcv-rc-ok" data-rc="352">OK</button>
+          <button class="rcv-rc-btn" data-rc="106">▶</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="114">Vol −</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="108">▼</button>
+          <button class="rcv-rc-btn rcv-rc-wide" data-rc="403">CH −</button>
+          <button class="rcv-rc-btn" data-rc="358" title="Info">ℹ</button>
+          <button class="rcv-rc-btn" data-rc="139" title="Menü">☰</button>
+          <button class="rcv-rc-btn" data-rc="392" title="Audio">🔊</button>
+          <button class="rcv-rc-btn rcv-rc-color rcv-rc-red" data-rc="398">Red</button>
+          <button class="rcv-rc-btn rcv-rc-color rcv-rc-green" data-rc="399">Green</button>
+          <button class="rcv-rc-btn rcv-rc-color rcv-rc-yellow" data-rc="400">Yellow</button>
+          <button class="rcv-rc-btn rcv-rc-color rcv-rc-blue" data-rc="401">Blue</button>
+          <button class="rcv-rc-btn" data-rc="377" title="Play">▶</button>
+          <button class="rcv-rc-btn" data-rc="119" title="Pause">⏸</button>
+          <button class="rcv-rc-btn" data-rc="128" title="Stop">⏹</button>
+          <button class="rcv-rc-btn" data-rc="167" title="Record">⏺</button>
+          <button class="rcv-rc-btn" data-rc="174" title="Subtitle">SUB</button>
+          <button class="rcv-rc-btn" data-rc="385" title="EPG">EPG</button>
+          <button class="rcv-rc-btn" data-rc="388" title="Exit/Back">EXIT</button>
+        </div>
+      </section>
+
       <!-- Send Message -->
       <section class="rcv-section">
         <h3 class="rcv-section-title">Nachricht senden</h3>
@@ -301,8 +370,28 @@
       <!-- Timer List -->
       <section class="rcv-section">
         <h3 class="rcv-section-title">Timer</h3>
+        <div class="rcv-timer-actions">
+          <button class="btn-secondary" id="rcvTimerRefresh">Aktualisieren</button>
+          <button class="btn-secondary" id="rcvTimerCleanup">Abgelaufene löschen</button>
+        </div>
         <div class="rcv-timer-list" id="rcvTimerList">
           <div class="list-placeholder">Lade Timer…</div>
+        </div>
+      </section>
+
+      <!-- Recordings -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Aufnahmen</h3>
+        <div class="rcv-timer-list" id="rcvRecordingList">
+          <div class="list-placeholder">Lade Aufnahmen…</div>
+        </div>
+      </section>
+
+      <!-- Enigma2 Settings -->
+      <section class="rcv-section">
+        <h3 class="rcv-section-title">Enigma2 Einstellungen</h3>
+        <div class="rcv-settings-list" id="rcvSettingsList">
+          <div class="list-placeholder">Lade Einstellungen…</div>
         </div>
       </section>
 

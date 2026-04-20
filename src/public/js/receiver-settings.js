@@ -32,11 +32,14 @@
   function esc(s) { return window._app.escHtml(s); }
 
   // ─── Load all sections ──────────────────────────────────────────────────
-  async function loadAll() {
+  function loadAll() {
     loadAbout();
     loadSignal();
     loadVolume();
+    loadSleepTimer();
     loadTimers();
+    loadRecordings();
+    loadSettings();
   }
 
   // ─── Receiver Info ──────────────────────────────────────────────────────
@@ -45,20 +48,27 @@
       const data = await api('/api/about');
       const info = data.info || {};
       const hdd  = (data.hdd || [])[0];
+      const ifaces = data.ifaces || [];
 
-      document.getElementById('rcvModel').textContent      = info.brand
+      document.getElementById('rcvModel').textContent = info.brand
         ? `${info.brand} ${info.model || ''}`.trim()
         : info.model || '–';
-      document.getElementById('rcvImage').textContent       = info.imagedistro
+      document.getElementById('rcvImage').textContent = info.imagedistro
         ? `${info.imagedistro} ${info.imageversion || ''}`.trim()
         : '–';
-      document.getElementById('rcvEnigmaVer').textContent   = info.enigmaver || '–';
-      document.getElementById('rcvWebifVer').textContent    = info.webifver || '–';
+      document.getElementById('rcvEnigmaVer').textContent = info.enigmaver || '–';
+      document.getElementById('rcvWebifVer').textContent  = info.webifver || '–';
+      document.getElementById('rcvKernel').textContent     = info.kernelver || '–';
 
       const tuners = (data.tuners || []).map(t => t.name || t.type).filter(Boolean);
       document.getElementById('rcvTuners').textContent = tuners.length
         ? `${tuners.length} (${tuners.join(', ')})`
         : '–';
+
+      if (ifaces.length > 0) {
+        const net = ifaces.map(i => `${i.name || ''}: ${i.ip || '?'}`).join(', ');
+        document.getElementById('rcvNetwork').textContent = net;
+      }
 
       if (hdd) {
         const free = hdd.free ? `${hdd.free}` : '';
@@ -72,6 +82,13 @@
     } catch {
       document.getElementById('rcvModel').textContent = 'Nicht erreichbar';
     }
+
+    // Current channel from statusinfo
+    try {
+      const st = await api('/api/statusinfo');
+      const name = st.currservice_name || st.currservice?.name;
+      document.getElementById('rcvCurrentCh').textContent = name || '–';
+    } catch {}
   }
 
   // ─── Signal ─────────────────────────────────────────────────────────────
@@ -161,6 +178,55 @@
     setVol(Math.max(0, Math.min(100, pct)));
   });
 
+  // ─── Sleep Timer ────────────────────────────────────────────────────────
+  const sleepStatus = document.getElementById('rcvSleepStatus');
+
+  async function loadSleepTimer() {
+    try {
+      const data = await api('/api/sleeptimer?cmd=get');
+      if (data.enabled) {
+        sleepStatus.textContent = `Aktiv: ${data.minutes || '?'} min → ${data.action || 'standby'}`;
+      } else {
+        sleepStatus.textContent = 'Inaktiv';
+      }
+    } catch {
+      sleepStatus.textContent = '';
+    }
+  }
+
+  document.getElementById('rcvSleepSet').addEventListener('click', async () => {
+    const time = document.getElementById('rcvSleepTime').value;
+    const action = document.getElementById('rcvSleepAction').value;
+    try {
+      await api(`/api/sleeptimer?cmd=set&time=${time}&action=${action}&enabled=True`);
+      showToast(`Sleep Timer: ${time} min`);
+      loadSleepTimer();
+    } catch (err) {
+      showToast(`Fehler: ${err.message}`);
+    }
+  });
+
+  document.getElementById('rcvSleepOff').addEventListener('click', async () => {
+    try {
+      await api('/api/sleeptimer?cmd=set&enabled=False');
+      showToast('Sleep Timer deaktiviert');
+      loadSleepTimer();
+    } catch (err) {
+      showToast(`Fehler: ${err.message}`);
+    }
+  });
+
+  // ─── Remote Control ─────────────────────────────────────────────────────
+  document.querySelectorAll('[data-rc]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.style.opacity = '0.5';
+      try {
+        await api(`/api/remotecontrol?command=${btn.dataset.rc}`);
+      } catch {}
+      setTimeout(() => { btn.style.opacity = ''; }, 200);
+    });
+  });
+
   // ─── Send Message ───────────────────────────────────────────────────────
   document.getElementById('rcvMsgSend').addEventListener('click', async () => {
     const text = document.getElementById('rcvMsgInput').value.trim();
@@ -176,6 +242,17 @@
   });
 
   // ─── Timers ─────────────────────────────────────────────────────────────
+  document.getElementById('rcvTimerRefresh').addEventListener('click', loadTimers);
+  document.getElementById('rcvTimerCleanup').addEventListener('click', async () => {
+    try {
+      await api('/api/timercleanup');
+      showToast('Abgelaufene Timer gelöscht');
+      loadTimers();
+    } catch (err) {
+      showToast(`Fehler: ${err.message}`);
+    }
+  });
+
   async function loadTimers() {
     const list = document.getElementById('rcvTimerList');
     try {
@@ -202,6 +279,7 @@
           stateClass = 'rcv-timer-done';
           stateLabel = 'Fertig';
         }
+        if (t.disabled) stateLabel = 'Deaktiviert';
 
         const icon = t.disabled ? '⏸' : (stateLabel === 'Läuft' ? '🔴' : '⏰');
 
@@ -213,12 +291,144 @@
             <div class="rcv-timer-name">${esc(t.name || t.servicename || '–')}</div>
             <div class="rcv-timer-meta">${esc(t.servicename || '')} · ${fmt(begin)} – ${fmt(end)}</div>
           </div>
+          <div class="rcv-timer-btns">
+            <button class="rcv-timer-toggle" title="${t.disabled ? 'Aktivieren' : 'Deaktivieren'}">${t.disabled ? '▶' : '⏸'}</button>
+            <button class="rcv-timer-del" title="Löschen">✕</button>
+          </div>
           <span class="rcv-timer-state ${stateClass}">${stateLabel}</span>
+        `;
+
+        item.querySelector('.rcv-timer-toggle').addEventListener('click', async () => {
+          try {
+            await api(`/api/timertoggle?sRef=${encodeURIComponent(t.servicereference)}&begin=${t.begin}&end=${t.end}`);
+            showToast('Timer umgeschaltet');
+            loadTimers();
+          } catch (err) { showToast(`Fehler: ${err.message}`); }
+        });
+
+        item.querySelector('.rcv-timer-del').addEventListener('click', async () => {
+          if (!confirm(`Timer "${t.name || t.servicename}" löschen?`)) return;
+          try {
+            await api(`/api/timerdelete?sRef=${encodeURIComponent(t.servicereference)}&begin=${t.begin}&end=${t.end}`);
+            showToast('Timer gelöscht');
+            loadTimers();
+          } catch (err) { showToast(`Fehler: ${err.message}`); }
+        });
+
+        list.appendChild(item);
+      });
+    } catch (err) {
+      list.innerHTML = `<div class="list-placeholder">Fehler: ${esc(err.message)}</div>`;
+    }
+  }
+
+  // ─── Recordings ─────────────────────────────────────────────────────────
+  async function loadRecordings() {
+    const list = document.getElementById('rcvRecordingList');
+    try {
+      const data = await api('/api/recordings');
+      const movies = data.movies || [];
+      if (movies.length === 0) {
+        list.innerHTML = '<div class="list-placeholder">Keine Aufnahmen vorhanden</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      movies.slice(0, 50).forEach(m => {
+        const name = m.eventname || m.filename || '–';
+        const svc  = m.servicename || '';
+        const len  = m.length ? `${m.length}` : '';
+        const size = m.filesize ? formatBytes(m.filesize) : '';
+        const desc = m.description || '';
+
+        const item = document.createElement('div');
+        item.className = 'rcv-rec-item';
+        item.innerHTML = `
+          <span class="rcv-timer-icon">🎬</span>
+          <div class="rcv-rec-info">
+            <div class="rcv-rec-name" title="${esc(name)}">${esc(name)}</div>
+            <div class="rcv-rec-meta">${esc(svc)}${len ? ' · ' + esc(len) : ''}${desc ? ' · ' + esc(desc) : ''}</div>
+          </div>
+          ${size ? `<span class="rcv-rec-size">${esc(size)}</span>` : ''}
         `;
         list.appendChild(item);
       });
     } catch (err) {
       list.innerHTML = `<div class="list-placeholder">Fehler: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+    return `${(bytes / 1073741824).toFixed(1)} GB`;
+  }
+
+  // ─── Enigma2 Settings ───────────────────────────────────────────────────
+  let allSettings = [];
+
+  async function loadSettings() {
+    const container = document.getElementById('rcvSettingsList');
+    try {
+      const data = await api('/api/settings');
+      allSettings = data.settings || [];
+      if (allSettings.length === 0) {
+        container.innerHTML = '<div class="list-placeholder">Keine Einstellungen verfügbar</div>';
+        return;
+      }
+
+      renderSettings(allSettings, container);
+    } catch (err) {
+      container.innerHTML = `<div class="list-placeholder">Fehler: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderSettings(settings, container) {
+    container.innerHTML = '';
+
+    // Search filter
+    const filter = document.createElement('input');
+    filter.className = 'channel-search rcv-settings-filter';
+    filter.type = 'search';
+    filter.placeholder = 'Einstellung suchen…';
+    filter.addEventListener('input', () => {
+      const q = filter.value.toLowerCase();
+      const filtered = q ? allSettings.filter(s =>
+        (s.key || s[0] || '').toLowerCase().includes(q) ||
+        (s.value || s[1] || '').toLowerCase().includes(q)
+      ) : allSettings;
+      renderSettingItems(filtered, listEl);
+    });
+    container.appendChild(filter);
+
+    const listEl = document.createElement('div');
+    listEl.className = 'rcv-settings-list';
+    container.appendChild(listEl);
+
+    renderSettingItems(settings, listEl);
+  }
+
+  function renderSettingItems(settings, listEl) {
+    listEl.innerHTML = '';
+    settings.slice(0, 200).forEach(s => {
+      const key = s.key || s[0] || '';
+      const val = s.value !== undefined ? s.value : (s[1] || '');
+
+      const item = document.createElement('div');
+      item.className = 'rcv-setting-item';
+      item.innerHTML = `
+        <span class="rcv-setting-key" title="${esc(key)}">${esc(key)}</span>
+        <span class="rcv-setting-val" title="${esc(String(val))}">${esc(String(val))}</span>
+      `;
+      listEl.appendChild(item);
+    });
+
+    if (settings.length > 200) {
+      const more = document.createElement('div');
+      more.className = 'list-placeholder';
+      more.textContent = `… und ${settings.length - 200} weitere (Suchfilter nutzen)`;
+      listEl.appendChild(more);
     }
   }
 

@@ -561,6 +561,7 @@
       : Promise.resolve();
 
     // Feed the fMP4 byte stream into the SourceBuffer in background
+    let playStarted = false;
     (async () => {
       try {
         const resp = await fetch(`/stream-fmp4/${encodeURIComponent(sRef)}`, {
@@ -575,9 +576,9 @@
 
           await waitSb();
 
-          // Keep buffer to ~20 s to avoid QuotaExceededError
-          if (sb.buffered.length > 0 && videoEl.currentTime > 25) {
-            const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 15);
+          // Keep buffer to ~15 s to avoid QuotaExceededError
+          if (sb.buffered.length > 0 && videoEl.currentTime > 20) {
+            const trimTo = Math.max(sb.buffered.start(0), videoEl.currentTime - 10);
             if (trimTo > sb.buffered.start(0) + 1) {
               sb.remove(sb.buffered.start(0), trimTo);
               await waitSb();
@@ -589,15 +590,28 @@
           } catch (appendErr) {
             console.warn('fMP4 appendBuffer:', appendErr.message);
           }
+
+          // Start playback as soon as first data is buffered
+          if (!playStarted && sb.buffered.length > 0) {
+            playStarted = true;
+            videoEl.currentTime = sb.buffered.end(0);
+            videoEl.play().catch(() => {});
+          }
+
+          // Chase live edge — if we fall behind, jump forward
+          if (sb.buffered.length > 0) {
+            const edge = sb.buffered.end(sb.buffered.length - 1);
+            if (edge - videoEl.currentTime > 4) {
+              videoEl.currentTime = edge - 0.5;
+            }
+          }
         }
       } catch (err) {
-        if (err.name === 'AbortError') return; // normal stop via stopCurrentPlayback
+        if (err.name === 'AbortError') return;
         console.error('fMP4 stream error:', err.message);
         if (onFatalFallback) onFatalFallback();
       }
     })();
-
-    videoEl.play().catch(() => {});
   }
 
   // ─── Fallback: HLS via server-side ffmpeg (old iOS / non-MSE) ────────────
