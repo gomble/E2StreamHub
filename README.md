@@ -8,7 +8,7 @@ Stream live TV, browse the EPG, manage bouquets, and fully control your receiver
 
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](#-quick-start)
 [![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)](#%EF%B8%8F-tech-stack)
-[![License](https://img.shields.io/badge/license-MIT-blue)](#)
+[![License](https://img.shields.io/badge/license-Custom%20%E2%80%93%20see%20LICENSE-orange)](#)
 
 <br/>
 
