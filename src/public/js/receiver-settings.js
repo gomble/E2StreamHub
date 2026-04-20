@@ -38,7 +38,6 @@
     loadVolume();
     loadSleepTimer();
     loadTimers();
-    loadRecordings();
     loadSettings();
   }
 
@@ -320,49 +319,6 @@
     } catch (err) {
       list.innerHTML = `<div class="list-placeholder">Fehler: ${esc(err.message)}</div>`;
     }
-  }
-
-  // ─── Recordings ─────────────────────────────────────────────────────────
-  async function loadRecordings() {
-    const list = document.getElementById('rcvRecordingList');
-    try {
-      const data = await api('/api/recordings');
-      const movies = data.movies || [];
-      if (movies.length === 0) {
-        list.innerHTML = '<div class="list-placeholder">Keine Aufnahmen vorhanden</div>';
-        return;
-      }
-
-      list.innerHTML = '';
-      movies.slice(0, 50).forEach(m => {
-        const name = m.eventname || m.filename || '–';
-        const svc  = m.servicename || '';
-        const len  = m.length ? `${m.length}` : '';
-        const size = m.filesize ? formatBytes(m.filesize) : '';
-        const desc = m.description || '';
-
-        const item = document.createElement('div');
-        item.className = 'rcv-rec-item';
-        item.innerHTML = `
-          <span class="rcv-timer-icon">🎬</span>
-          <div class="rcv-rec-info">
-            <div class="rcv-rec-name" title="${esc(name)}">${esc(name)}</div>
-            <div class="rcv-rec-meta">${esc(svc)}${len ? ' · ' + esc(len) : ''}${desc ? ' · ' + esc(desc) : ''}</div>
-          </div>
-          ${size ? `<span class="rcv-rec-size">${esc(size)}</span>` : ''}
-        `;
-        list.appendChild(item);
-      });
-    } catch (err) {
-      list.innerHTML = `<div class="list-placeholder">Fehler: ${esc(err.message)}</div>`;
-    }
-  }
-
-  function formatBytes(bytes) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
-    return `${(bytes / 1073741824).toFixed(1)} GB`;
   }
 
   // ─── Enigma2 Settings ───────────────────────────────────────────────────

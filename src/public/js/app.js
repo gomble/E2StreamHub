@@ -1126,7 +1126,7 @@
       item.addEventListener('click', () => {
         recList.querySelectorAll('.rec-item').forEach(el => el.classList.remove('active'));
         item.classList.add('active');
-        playRecording(sRef, filename, name);
+        playRecording(m);
       });
       recList.appendChild(item);
     });
@@ -1144,7 +1144,15 @@
     renderRecordings(filtered);
   });
 
-  async function playRecording(sRef, filename, name) {
+  async function playRecording(movie) {
+    const sRef = movie.servicereference || '';
+    const name = movie.eventname || movie.filename || '–';
+    const svc = movie.servicename || '';
+    const desc = movie.description || '';
+    const longdesc = movie.descriptionextended || movie.longdesc || '';
+    const len = movie.length || '';
+    const size = movie.filesize ? formatRecBytes(movie.filesize) : '';
+
     document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
     currentSRef = sRef;
     currentChannelName = name;
@@ -1174,12 +1182,23 @@
     }
 
     nowPlaying.style.display = 'flex';
-    npChannel.innerHTML = `<span>${escHtml(name)}</span>`;
-    npTitle.textContent = '';
-    npTime.textContent = '';
+    npChannel.innerHTML = `<span>${escHtml(svc || name)}</span>`;
+    npTitle.textContent = name;
+    npTime.textContent = len ? `Dauer: ${len}` : '';
     document.getElementById('npProgress').style.width = '0';
 
-    epgContent.innerHTML = '<div class="epg-empty">Aufnahme wird abgespielt</div>';
+    // Show recording info in EPG panel
+    epgContent.innerHTML = '';
+    const infoHtml = `
+      <div class="epg-event current" style="border-left-color:var(--accent)">
+        <div class="epg-event-time">Aufnahme${svc ? ' · ' + escHtml(svc) : ''}</div>
+        <div class="epg-event-title">${escHtml(name)}</div>
+        ${desc ? `<div class="epg-event-desc" style="-webkit-line-clamp:unset">${escHtml(desc)}</div>` : ''}
+        ${longdesc ? `<div class="epg-event-desc" style="-webkit-line-clamp:unset;margin-top:8px;color:var(--text)">${escHtml(longdesc)}</div>` : ''}
+        <div class="epg-event-duration">${[len, size].filter(Boolean).join(' · ')}</div>
+      </div>
+    `;
+    epgContent.innerHTML = infoHtml;
     updatePip();
   }
 
