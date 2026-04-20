@@ -20,11 +20,9 @@ const PORT = process.env.PORT || 2000;
 const logClients = new Set();
 
 function broadcastLog(level, args) {
-  const d = new Date();
-  const localMs = d.getTime() - d.getTimezoneOffset() * 60000;
-  const ts = new Date(localMs).toISOString().slice(0, 19);
+  const epochMs = Date.now();
   const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  const payload = JSON.stringify({ ts, level, msg });
+  const payload = JSON.stringify({ epochMs, level, msg });
   for (const res of logClients) {
     res.write(`data: ${payload}\n\n`);
   }
@@ -1487,10 +1485,10 @@ async function resolveSptsUrl(sRef) {
     for (const line of m3u.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-        // The receiver sometimes appends ":Channel Name" after the URL path.
-        // Use URL() to parse only the valid part, then rebuild cleanly.
-        const url = new URL(trimmed);
-        // Replace hostname — Docker often can't resolve Fritz.Box mDNS names
+        // Receiver sometimes appends ":Channel Name" after the URL — strip it.
+        // Match up to the first colon that comes AFTER the path (not after http:)
+        const rawUrl = trimmed.replace(/^(https?:\/\/[^/]+\/[^\s]*).*$/, '$1');
+        const url = new URL(rawUrl);
         const port = url.port || '80';
         const resolved = `http://${ENIGMA2_HOST}:${port}${url.pathname}`;
         console.log(`stream.m3u resolved: ${resolved}`);

@@ -1041,10 +1041,10 @@
     logSource = new EventSource('/api/logs');
     logSource.onmessage = (e) => {
       try {
-        const { ts, level, msg } = JSON.parse(e.data);
+        const { epochMs, level, msg } = JSON.parse(e.data);
         const line = document.createElement('div');
         line.className = `log-line log-${level}`;
-        const time = ts.slice(11, 19);
+        const time = new Date(epochMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         line.innerHTML = `<span class="log-ts">${time}</span>${escHtml(msg)}`;
         logBody.appendChild(line);
         while (logBody.children.length > MAX_LOG_LINES) logBody.removeChild(logBody.firstChild);
