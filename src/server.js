@@ -1825,6 +1825,16 @@ app.get('/api/logs', requireAuth, (req, res) => {
   req.on('close', () => logClients.delete(res));
 });
 
+// ─── Picon directory lookup ──────────────────────────────────────────────────
+app.get('/api/picondir', requireAuth, async (req, res) => {
+  try {
+    const dir = await detectPiconDir();
+    res.json({ path: dir });
+  } catch (e) {
+    res.json({ path: '/usr/share/enigma2/picon' });
+  }
+});
+
 // ─── SFTP File Browser API ───────────────────────────────────────────────────
 
 app.get('/api/files/ls', requireAuth, async (req, res) => {

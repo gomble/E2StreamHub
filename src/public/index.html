@@ -628,8 +628,8 @@
         </div>
         <div class="cmd-group">
           <div class="cmd-group-title">Logs</div>
-          <button class="cmd-btn" data-cmd="tail -50 /var/log/messages 2>/dev/null || journalctl -n 50 --no-pager" data-mode="exec" title="System Log">System Log</button>
-          <button class="cmd-btn" data-cmd="tail -50 /tmp/enigma2_crash.log 2>/dev/null || echo 'Kein Crashlog'" data-mode="exec" title="Crash Log">Crash Log</button>
+          <button class="cmd-btn" data-cmd="tail -50 /var/volatile/log/messages 2>/dev/null || tail -50 /var/log/messages 2>/dev/null || dmesg | tail -50" data-mode="exec" title="System Log">System Log</button>
+          <button class="cmd-btn" data-cmd="cat /tmp/enigma2_crash.log 2>/dev/null || ls -la /tmp/enigma2_crash* 2>/dev/null || echo 'Kein Crashlog vorhanden'" data-mode="exec" title="Crash Log">Crash Log</button>
         </div>
         <div class="cmd-group">
           <div class="cmd-group-title">EPG & Cache</div>
@@ -684,6 +684,7 @@
   <!-- Context menu -->
   <div class="fb-ctx-menu" id="fbContextMenu" style="display:none">
     <button class="fb-ctx-item" id="fbCtxOpen">Öffnen</button>
+    <button class="fb-ctx-item" id="fbCtxEdit">Bearbeiten</button>
     <button class="fb-ctx-item" id="fbCtxRename">Umbenennen</button>
     <button class="fb-ctx-item" id="fbCtxCopy">Kopieren</button>
     <button class="fb-ctx-item" id="fbCtxMove">Verschieben</button>

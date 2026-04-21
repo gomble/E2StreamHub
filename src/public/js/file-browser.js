@@ -24,8 +24,7 @@
     { name: 'Plugins', path: '/usr/lib/enigma2/python/Plugins' },
     { name: 'Skins', path: '/usr/share/enigma2' },
     { name: 'Recordings', path: '/media/hdd/movie' },
-    { name: 'Picons', path: '/usr/share/enigma2/picon' },
-    { name: 'EPG Data', path: '/etc/enigma2/epg.dat' },
+    { name: 'Picons', path: null, dynamic: 'picondir' },
     { name: 'Scripts', path: '/usr/script' },
     { name: 'Tmp', path: '/tmp' },
     { name: 'Media', path: '/media' },
@@ -65,8 +64,20 @@
     const btn = document.createElement('button');
     btn.className = 'fb-ql-btn';
     btn.textContent = ql.name;
-    btn.title = ql.path;
-    btn.addEventListener('click', () => navigate(ql.path));
+    btn.title = ql.path || '…';
+    if (ql.dynamic === 'picondir') {
+      btn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/picondir');
+          const data = await res.json();
+          const dir = data.path || '/usr/share/enigma2/picon';
+          btn.title = dir;
+          navigate(dir);
+        } catch { navigate('/usr/share/enigma2/picon'); }
+      });
+    } else {
+      btn.addEventListener('click', () => navigate(ql.path));
+    }
     qlContainer.appendChild(btn);
   });
 
@@ -203,6 +214,16 @@
     else openFile(ctxTarget.path, ctxTarget.name);
   });
 
+  document.getElementById('fbCtxEdit')?.addEventListener('click', async () => {
+    if (!ctxTarget || ctxTarget.isDir) return;
+    try {
+      const res = await fetch(`/api/files/read?path=${encodeURIComponent(ctxTarget.path)}`);
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      openEditor(ctxTarget.path, ctxTarget.name, data.content || '');
+    } catch (err) { alert('Error: ' + err.message); }
+  });
+
   document.getElementById('fbCtxRename')?.addEventListener('click', async () => {
     if (!ctxTarget) return;
     const newName = prompt('Neuer Name:', ctxTarget.name);
@@ -271,9 +292,13 @@
 
   // Text editor
   async function openFile(filePath, fileName) {
-    const ext = fileName.split('.').pop().toLowerCase();
-    const textExts = ['txt','conf','cfg','xml','py','sh','log','json','ini','yml','yaml','html','css','js','ts','service','timer','list','ipk','rule','pls','m3u','csv'];
-    if (!textExts.includes(ext) && !fileName.startsWith('.')) {
+    const ext = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+    const textExts = ['txt','conf','cfg','xml','py','sh','log','json','ini','yml','yaml','html','css','js','ts','service','timer','list','rule','pls','m3u','csv','dat'];
+    const binaryExts = ['png','jpg','jpeg','gif','bmp','ico','mp4','mkv','avi','ts','mp3','wav','flac','zip','gz','tar','rar','7z','ipk','deb','so','o','bin','img'];
+    const knownTextFiles = ['settings','satellites.xml','lamedb','whitelist','blacklist','profile','fstab','resolv.conf','hosts','passwd','shadow','rc.local','crontab'];
+    const isBinary = binaryExts.includes(ext);
+    const isText = textExts.includes(ext) || fileName.startsWith('.') || !ext || knownTextFiles.includes(fileName);
+    if (isBinary || !isText) {
       window.open(`/api/files/download?path=${encodeURIComponent(filePath)}`, '_blank');
       return;
     }
