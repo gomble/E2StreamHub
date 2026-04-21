@@ -1,6 +1,8 @@
 services:
   e2streamhub:
-    build: .
+    image: gomble/e2streamhub:latest
+    # To build locally instead of pulling from Docker Hub, uncomment below:
+    # build: .
     container_name: e2streamhub
     ports:
       - "2000:2000"
