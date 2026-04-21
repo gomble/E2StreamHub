@@ -129,8 +129,13 @@ input { font-family: inherit; }
   font-size: 18px; transition: color .2s;
 }
 .topbar-link:hover { color: #fff; }
-.topbar-coffee { font-size: 22px; }
-.topbar-coffee:hover { color: #ffdd00; }
+.topbar-coffee {
+  font-size: 11px; font-weight: 600;
+  color: #ffdd00; padding: 3px 10px;
+  border: 1px solid rgba(255,221,0,.4);
+  border-radius: 6px; white-space: nowrap;
+}
+.topbar-coffee:hover { background: rgba(255,221,0,.12); color: #ffdd00; border-color: #ffdd00; }
 .topbar-gh-icon { width: 18px; height: 18px; }
 .topbar-version {
   font-size: 11px; font-weight: 600;
