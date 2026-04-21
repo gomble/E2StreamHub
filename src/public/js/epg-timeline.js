@@ -195,11 +195,12 @@
           data-name="${escAttr(ch.name)}"
           data-evtidx="${evtMap.length}"
           title="${escAttr(window._app.decodeHtml(evt.title || ''))} (${fmtTime(startDate)}–${fmtTime(endDate)})">`;
+        html += `<div class="epg-program-inner">`;
         html += `<div class="epg-program-title">${window._app.escHtml(window._app.decodeHtml(evt.title || '–'))}</div>`;
         if (widthPx > 80) {
           html += `<div class="epg-program-time">${fmtTime(startDate)}–${fmtTime(endDate)}</div>`;
         }
-        html += `</div>`;
+        html += `</div></div>`;
         evtMap.push(evt);
       });
 
