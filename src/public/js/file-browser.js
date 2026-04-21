@@ -102,7 +102,7 @@
       currentPath = dir;
       pathInput.value = dir;
       updateBreadcrumb(dir);
-      renderFiles(data.files || []);
+      renderFiles(data.entries || []);
       selectedItems.clear();
     } catch (err) {
       alert('Error: ' + err.message);
@@ -152,7 +152,7 @@
 
     const perms = document.createElement('span');
     perms.className = 'fb-perms';
-    perms.textContent = f.perms || '';
+    perms.textContent = f.mode || '';
 
     row.append(icon, name, size, date, perms);
 
@@ -209,7 +209,7 @@
     if (!newName || newName === ctxTarget.name) return;
     const parentDir = ctxTarget.path.replace(/\/[^/]+$/, '') || '/';
     const newPath = parentDir + '/' + newName;
-    await apiPost('/api/files/rename', { oldPath: ctxTarget.path, newPath });
+    await apiPost('/api/files/rename', { from: ctxTarget.path, to: newPath });
     navigate(currentPath);
   });
 
@@ -217,7 +217,7 @@
     if (!ctxTarget) return;
     const dest = prompt('Ziel-Pfad:', ctxTarget.path + '_copy');
     if (!dest) return;
-    await apiPost('/api/files/copy', { src: ctxTarget.path, dest });
+    await apiPost('/api/files/copy', { from: ctxTarget.path, to: dest });
     navigate(currentPath);
   });
 
@@ -225,7 +225,7 @@
     if (!ctxTarget) return;
     const dest = prompt('Verschieben nach:', ctxTarget.path);
     if (!dest || dest === ctxTarget.path) return;
-    await apiPost('/api/files/rename', { oldPath: ctxTarget.path, newPath: dest });
+    await apiPost('/api/files/rename', { from: ctxTarget.path, to: dest });
     navigate(currentPath);
   });
 

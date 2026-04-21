@@ -137,13 +137,14 @@
         })
         .then(r => r.json())
         .then(data => {
+          term?.writeln(`\r\n\x1b[36m$ ${cmd}\x1b[0m`);
           if (data.error) {
-            term?.writeln(`\r\n\x1b[31m${data.error}\x1b[0m`);
-          } else {
-            term?.writeln(`\r\n\x1b[36m$ ${cmd}\x1b[0m`);
-            if (data.stdout) term?.writeln(data.stdout);
-            if (data.stderr) term?.writeln(`\x1b[31m${data.stderr}\x1b[0m`);
-            term?.writeln('\x1b[32mDone.\x1b[0m');
+            term?.writeln(`\x1b[31m${data.error}\x1b[0m`);
+          } else if (data.output) {
+            data.output.split('\n').forEach(line => term?.writeln(line));
+          }
+          if (!data.ok) {
+            term?.writeln('\x1b[31mFailed.\x1b[0m');
           }
         })
         .catch(err => term?.writeln(`\r\n\x1b[31m${err.message}\x1b[0m`));

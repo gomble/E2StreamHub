@@ -1953,9 +1953,10 @@ app.post('/api/ssh/exec', requireAuth, async (req, res) => {
   if (!command) return res.status(400).json({ error: 'command required' });
   try {
     const output = await sshExec(command);
-    res.json({ ok: true, output });
+    res.json({ ok: true, output: output || '(no output)' });
   } catch (e) {
-    res.json({ ok: false, output: e.message });
+    const msg = e.message || String(e);
+    res.json({ ok: false, output: msg });
   }
 });
 
