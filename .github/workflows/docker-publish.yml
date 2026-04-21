@@ -21,7 +21,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: gomble/e2streamhub
+          images: gomble59/e2streamhub
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

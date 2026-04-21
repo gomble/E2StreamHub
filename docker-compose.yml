@@ -1,6 +1,6 @@
 services:
   e2streamhub:
-    image: gomble/e2streamhub:latest
+    image: gomble59/e2streamhub:latest
     # To build locally instead of pulling from Docker Hub, uncomment below:
     # build: .
     container_name: e2streamhub
