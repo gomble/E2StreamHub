@@ -2182,6 +2182,312 @@ input { font-family: inherit; }
 }
 .pip-window:hover .pip-resize { opacity: 1; }
 
+/* ─── SSH Terminal Overlay ─────────────────────────────────────────────────── */
+.terminal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.terminal-overlay.open { opacity: 1; pointer-events: auto; }
+.terminal-overlay::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(0,0,0,.55);
+}
+
+.terminal-panel {
+  position: relative;
+  width: 100%; height: calc(100vh - var(--topbar-h));
+  margin-top: var(--topbar-h);
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  transform: translateY(30px);
+  transition: transform .2s;
+}
+.terminal-overlay.open .terminal-panel { transform: translateY(0); }
+
+.terminal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.terminal-title {
+  font-size: 15px; font-weight: 700; color: #fff;
+}
+.terminal-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn-sm {
+  font-size: 12px; padding: 4px 10px;
+}
+
+.terminal-body {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
+
+/* Command sidebar */
+.cmd-sidebar {
+  width: 200px; flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 12px;
+}
+.cmd-sidebar-title {
+  font-size: 13px; font-weight: 700; color: #fff;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.cmd-group { margin-bottom: 14px; }
+.cmd-group-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.cmd-btn {
+  display: block; width: 100%;
+  background: var(--bg4); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  font-size: 12px; padding: 6px 10px;
+  text-align: left; cursor: pointer;
+  margin-bottom: 4px;
+  transition: background .15s, border-color .15s;
+}
+.cmd-btn:hover { background: var(--bg3); border-color: var(--accent); color: #fff; }
+
+/* Terminal container */
+.term-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.term-container {
+  flex: 1; padding: 8px;
+  background: #0d0d0d;
+  min-height: 0;
+}
+.term-container .xterm { height: 100%; }
+
+/* ─── File Browser Overlay ────────────────────────────────────────────────── */
+.fb-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.fb-overlay.open { opacity: 1; pointer-events: auto; }
+.fb-overlay::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(0,0,0,.55);
+}
+
+.fb-panel {
+  position: relative;
+  width: 100%; height: calc(100vh - var(--topbar-h));
+  margin-top: var(--topbar-h);
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  transform: translateY(30px);
+  transition: transform .2s;
+}
+.fb-overlay.open .fb-panel { transform: translateY(0); }
+
+.fb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fb-title { font-size: 15px; font-weight: 700; color: #fff; }
+.fb-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.fb-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fb-breadcrumb {
+  display: flex; align-items: center; gap: 2px;
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+}
+.fb-crumb {
+  font-size: 13px; color: var(--text-dim);
+  cursor: pointer; white-space: nowrap;
+  padding: 2px 4px; border-radius: 4px;
+  transition: color .15s, background .15s;
+}
+.fb-crumb:hover { color: var(--accent); background: var(--bg4); }
+.fb-crumb-sep { font-size: 13px; color: var(--text-muted); }
+
+.fb-path-input {
+  width: 280px;
+  background: var(--bg4); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  font-size: 13px; padding: 5px 10px;
+  outline: none; font-family: 'Consolas', monospace;
+  transition: border-color .2s;
+}
+.fb-path-input:focus { border-color: var(--accent); }
+
+.fb-body {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
+
+/* Quick links sidebar */
+.fb-quick-links {
+  width: 180px; flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 12px;
+}
+.fb-ql-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--text-muted);
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.fb-ql-btn {
+  display: block; width: 100%;
+  background: transparent; border: none;
+  color: var(--text-dim); font-size: 12px;
+  padding: 6px 8px; text-align: left;
+  border-radius: 4px; cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.fb-ql-btn:hover { color: #fff; background: var(--bg4); }
+
+/* File list */
+.fb-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.fb-list-header {
+  display: flex; align-items: center;
+  padding: 6px 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .5px; flex-shrink: 0;
+}
+.fb-lh-icon { width: 28px; flex-shrink: 0; }
+.fb-lh-name { flex: 1; }
+.fb-lh-size { width: 80px; text-align: right; }
+.fb-lh-date { width: 130px; text-align: right; padding-right: 12px; }
+.fb-lh-perms { width: 90px; }
+
+.fb-file-list {
+  flex: 1; overflow-y: auto;
+}
+
+.fb-row {
+  display: flex; align-items: center;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: 1px solid rgba(44,44,44,.3);
+}
+.fb-row:hover { background: var(--bg4); }
+.fb-row.selected { background: var(--accent-dim); }
+.fb-row.fb-dir .fb-name { color: #3b82f6; font-weight: 600; }
+
+.fb-icon { width: 28px; flex-shrink: 0; font-size: 15px; text-align: center; }
+.fb-name {
+  flex: 1; font-size: 13px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.fb-size {
+  width: 80px; font-size: 12px; color: var(--text-dim);
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.fb-date {
+  width: 130px; font-size: 12px; color: var(--text-dim);
+  text-align: right; padding-right: 12px;
+}
+.fb-perms {
+  width: 90px; font-size: 11px; color: var(--text-muted);
+  font-family: 'Consolas', monospace;
+}
+
+/* Context menu */
+.fb-ctx-menu {
+  position: fixed; z-index: 300;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.fb-ctx-item {
+  display: block; width: 100%;
+  background: transparent; border: none;
+  color: var(--text); font-size: 13px;
+  padding: 8px 16px; text-align: left;
+  cursor: pointer;
+  transition: background .1s;
+}
+.fb-ctx-item:hover { background: var(--bg4); }
+.fb-ctx-danger { color: var(--accent); }
+.fb-ctx-sep {
+  border: none; border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* Text editor modal */
+.fb-editor-modal {
+  position: fixed; inset: 0; z-index: 210;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.6);
+}
+.fb-editor-modal.open { display: flex; }
+
+.fb-editor-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 90vw; max-width: 900px;
+  height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,.6);
+}
+.fb-editor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.fb-editor-title {
+  font-size: 14px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fb-editor-actions { display: flex; gap: 8px; }
+
+.fb-editor-area {
+  flex: 1; resize: none;
+  background: #0a0a0a; color: #e0e0e0;
+  border: none; outline: none;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px; line-height: 1.6;
+  padding: 16px; tab-size: 4;
+}
+
+/* ─── Split Screen ────────────────────────────────────────────────────────── */
+.terminal-overlay.split-left {
+  right: 50%; z-index: 201;
+}
+.terminal-overlay.split-left::before { display: none; }
+.terminal-overlay.split-left .terminal-panel {
+  height: calc(100vh - var(--topbar-h));
+}
+
+.fb-overlay.split-right {
+  left: 50%; z-index: 201;
+}
+.fb-overlay.split-right::before { display: none; }
+.fb-overlay.split-right .fb-panel {
+  height: calc(100vh - var(--topbar-h));
+}
+
+.fb-overlay.split-right .fb-quick-links { display: none; }
+.fb-overlay.split-right .fb-path-input { width: 160px; }
+.terminal-overlay.split-left .cmd-sidebar { width: 160px; }
+
 /* ─── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .epg-panel { display: none; }
@@ -2199,4 +2505,13 @@ input { font-family: inherit; }
 @media (max-width: 640px) {
   .sidebar { width: 200px; }
   .current-time { display: none; }
+  .cmd-sidebar { width: 140px; font-size: 11px; }
+  .fb-quick-links { display: none; }
+  .fb-date, .fb-lh-date { display: none; }
+  .fb-perms, .fb-lh-perms { display: none; }
+  .fb-path-input { width: 120px; }
+  .terminal-overlay.split-left,
+  .fb-overlay.split-right { left: 0; right: 0; }
+  .terminal-overlay.split-left { bottom: 50%; top: 0; inset: 0 0 50% 0; }
+  .fb-overlay.split-right { top: 50%; bottom: 0; inset: 50% 0 0 0; }
 }

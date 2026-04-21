@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>E2StreamHub</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/xterm.css" />
 </head>
 <body>
 
@@ -19,6 +20,8 @@
     <button class="nav-btn" data-view="epg">EPG Guide</button>
     <button class="nav-btn" data-view="editor">Bouquet Editor</button>
     <button class="nav-btn" data-view="receiver">Receiver</button>
+    <button class="nav-btn" data-view="terminal">Terminal</button>
+    <button class="nav-btn" data-view="filebrowser">File Browser</button>
   </nav>
   <div class="topbar-right">
     <button class="nav-btn" id="appSettingsBtn" title="App Settings">⚙</button>
@@ -580,6 +583,130 @@
   </div>
 </div>
 
+<!-- ─── SSH Terminal Overlay ───────────────────────────────────────────────── -->
+<div class="terminal-overlay" id="terminalOverlay" aria-hidden="true">
+  <div class="terminal-panel">
+    <div class="terminal-header">
+      <span class="terminal-title">SSH Terminal</span>
+      <div class="terminal-header-actions">
+        <button class="btn-secondary btn-sm" id="termReconnectBtn">Reconnect</button>
+        <button class="btn-secondary btn-sm" id="terminalSplitBtn" title="Split mit File Browser">⬡ Split</button>
+        <button class="epg-overlay-close" id="terminalCloseBtn" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="terminal-body">
+      <aside class="cmd-sidebar">
+        <div class="cmd-sidebar-title">Enigma2 Commands</div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">System</div>
+          <button class="cmd-btn" data-cmd="init 4" data-mode="exec" title="GUI Neustart">GUI Neustart</button>
+          <button class="cmd-btn" data-cmd="reboot" data-mode="exec" title="Receiver Neustart">Reboot</button>
+          <button class="cmd-btn" data-cmd="halt" data-mode="exec" title="Shutdown">Shutdown</button>
+          <button class="cmd-btn" data-cmd="df -h" data-mode="exec" title="Speicherplatz">Speicherplatz</button>
+          <button class="cmd-btn" data-cmd="free -m" data-mode="exec" title="RAM Info">RAM Info</button>
+          <button class="cmd-btn" data-cmd="uptime" data-mode="exec" title="Uptime">Uptime</button>
+          <button class="cmd-btn" data-cmd="top -bn1 | head -20" data-mode="exec" title="Prozesse">Top Prozesse</button>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Enigma2</div>
+          <button class="cmd-btn" data-cmd="systemctl restart enigma2" data-mode="exec" title="Enigma2 Neustart">Enigma2 Restart</button>
+          <button class="cmd-btn" data-cmd="systemctl stop enigma2" data-mode="exec" title="Enigma2 Stop">Enigma2 Stop</button>
+          <button class="cmd-btn" data-cmd="systemctl start enigma2" data-mode="exec" title="Enigma2 Start">Enigma2 Start</button>
+          <button class="cmd-btn" data-cmd="enigma2 --version 2>&1 || cat /etc/enigma2/settings | head -5" data-mode="exec" title="Version">Version Info</button>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Netzwerk</div>
+          <button class="cmd-btn" data-cmd="ifconfig 2>/dev/null || ip addr" data-mode="exec" title="Netzwerk Info">Netzwerk Info</button>
+          <button class="cmd-btn" data-cmd="ping -c 3 8.8.8.8" data-mode="exec" title="Ping Test">Ping Test</button>
+          <button class="cmd-btn" data-cmd="netstat -tlnp 2>/dev/null || ss -tlnp" data-mode="exec" title="Offene Ports">Offene Ports</button>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Pakete</div>
+          <button class="cmd-btn" data-cmd="opkg update" data-mode="exec" title="Paketliste aktualisieren">opkg update</button>
+          <button class="cmd-btn" data-cmd="opkg upgradable" data-mode="exec" title="Updates anzeigen">Updates prüfen</button>
+          <button class="cmd-btn" data-cmd="opkg list-installed | wc -l" data-mode="exec" title="Installierte Pakete">Pakete zählen</button>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Logs</div>
+          <button class="cmd-btn" data-cmd="tail -50 /var/log/messages 2>/dev/null || journalctl -n 50 --no-pager" data-mode="exec" title="System Log">System Log</button>
+          <button class="cmd-btn" data-cmd="tail -50 /tmp/enigma2_crash.log 2>/dev/null || echo 'Kein Crashlog'" data-mode="exec" title="Crash Log">Crash Log</button>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">EPG & Cache</div>
+          <button class="cmd-btn" data-cmd="rm -f /etc/enigma2/epg.dat && echo 'EPG cache gelöscht'" data-mode="exec" title="EPG Cache löschen">EPG Cache löschen</button>
+          <button class="cmd-btn" data-cmd="rm -rf /tmp/*.cache 2>/dev/null; echo 'Temp cache bereinigt'" data-mode="exec" title="Temp löschen">Temp bereinigen</button>
+        </div>
+      </aside>
+      <div class="term-main">
+        <div id="termContainer" class="term-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── File Browser Overlay ─────────────────────────────────────────────── -->
+<div class="fb-overlay" id="fileBrowserOverlay" aria-hidden="true">
+  <div class="fb-panel">
+    <div class="fb-header">
+      <span class="fb-title">File Browser</span>
+      <div class="fb-header-actions">
+        <button class="btn-secondary btn-sm" id="fbNewFolder" title="Neuer Ordner">+ Ordner</button>
+        <button class="btn-secondary btn-sm" id="fbNewFile" title="Neue Datei">+ Datei</button>
+        <button class="btn-secondary btn-sm" id="fbDeleteSelected" title="Auswahl löschen">🗑</button>
+        <button class="btn-secondary btn-sm" id="fbRefresh" title="Aktualisieren">↻</button>
+        <button class="btn-secondary btn-sm" id="fbSplitBtn" title="Split mit Terminal">⬡ Split</button>
+        <button class="epg-overlay-close" id="fbCloseBtn" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="fb-toolbar">
+      <div class="fb-breadcrumb" id="fbBreadcrumb"></div>
+      <input class="fb-path-input" id="fbPathInput" type="text" value="/" placeholder="Pfad eingeben…" />
+    </div>
+    <div class="fb-body">
+      <aside class="fb-quick-links" id="fbQuickLinks">
+        <div class="fb-ql-title">Quick Links</div>
+      </aside>
+      <div class="fb-content">
+        <div class="fb-list-header">
+          <span class="fb-lh-icon"></span>
+          <span class="fb-lh-name">Name</span>
+          <span class="fb-lh-size">Größe</span>
+          <span class="fb-lh-date">Datum</span>
+          <span class="fb-lh-perms">Rechte</span>
+        </div>
+        <div class="fb-file-list" id="fbFileList">
+          <div class="list-placeholder">Lade Dateien…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context menu -->
+  <div class="fb-ctx-menu" id="fbContextMenu" style="display:none">
+    <button class="fb-ctx-item" id="fbCtxOpen">Öffnen</button>
+    <button class="fb-ctx-item" id="fbCtxRename">Umbenennen</button>
+    <button class="fb-ctx-item" id="fbCtxCopy">Kopieren</button>
+    <button class="fb-ctx-item" id="fbCtxMove">Verschieben</button>
+    <button class="fb-ctx-item" id="fbCtxDownload">Download</button>
+    <hr class="fb-ctx-sep" />
+    <button class="fb-ctx-item fb-ctx-danger" id="fbCtxDelete">Löschen</button>
+  </div>
+
+  <!-- Text editor modal -->
+  <div class="fb-editor-modal" id="fbEditorModal">
+    <div class="fb-editor-panel">
+      <div class="fb-editor-header">
+        <span class="fb-editor-title" id="fbEditorTitle">editor</span>
+        <div class="fb-editor-actions">
+          <button class="btn-accent btn-sm" id="fbEditorSave">Speichern</button>
+          <button class="btn-secondary btn-sm" id="fbEditorClose">Schließen</button>
+        </div>
+      </div>
+      <textarea class="fb-editor-area" id="fbEditorArea" spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+
 <!-- ─── PiP Window ───────────────────────────────────────────────────────── -->
 <div class="pip-window" id="pipWindow">
   <span class="pip-channel-badge" id="pipChannel"></span>
@@ -591,10 +718,14 @@
 <script src="/js/mpegts.js"></script>
 <script src="/js/hls.min.js"></script>
 <script src="/js/sortable.min.js"></script>
+<script src="/js/xterm.js"></script>
+<script src="/js/xterm-addon-fit.js"></script>
 <script src="/js/app.js"></script>
 <script src="/js/epg-timeline.js"></script>
 <script src="/js/bouquet-editor.js"></script>
 <script src="/js/receiver-settings.js"></script>
 <script src="/js/app-settings.js"></script>
+<script src="/js/ssh-terminal.js"></script>
+<script src="/js/file-browser.js"></script>
 </body>
 </html>

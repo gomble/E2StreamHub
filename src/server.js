@@ -1825,6 +1825,140 @@ app.get('/api/logs', requireAuth, (req, res) => {
   req.on('close', () => logClients.delete(res));
 });
 
+// ─── SFTP File Browser API ───────────────────────────────────────────────────
+
+app.get('/api/files/ls', requireAuth, async (req, res) => {
+  const dir = req.query.path || '/';
+  let conn;
+  try {
+    conn = await sshConnect();
+    const sftp = await new Promise((resolve, reject) => {
+      conn.sftp((err, s) => err ? reject(err) : resolve(s));
+    });
+    const list = await new Promise((resolve, reject) => {
+      sftp.readdir(dir, (err, items) => err ? reject(err) : resolve(items));
+    });
+    conn.end();
+    const entries = list
+      .filter(i => i.filename !== '.' && i.filename !== '..')
+      .map(i => ({
+        name: i.filename,
+        isDir: (i.attrs.mode & 0o40000) !== 0,
+        size: i.attrs.size,
+        mtime: i.attrs.mtime,
+        mode: '0' + (i.attrs.mode & 0o7777).toString(8),
+      }))
+      .sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+    res.json({ path: dir, entries });
+  } catch (e) {
+    if (conn) try { conn.end(); } catch {}
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.get('/api/files/read', requireAuth, async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) return res.status(400).json({ error: 'path required' });
+  try {
+    const content = await sshReadFile(filePath);
+    res.json({ path: filePath, content });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/files/write', requireAuth, async (req, res) => {
+  const { path: filePath, content } = req.body;
+  if (!filePath) return res.status(400).json({ error: 'path required' });
+  try {
+    await sshWriteFile(filePath, content || '');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/files/mkdir', requireAuth, async (req, res) => {
+  const { path: dirPath } = req.body;
+  if (!dirPath) return res.status(400).json({ error: 'path required' });
+  try {
+    await sshExec(`mkdir -p "${dirPath}"`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/files/delete', requireAuth, async (req, res) => {
+  const { path: targetPath } = req.body;
+  if (!targetPath || targetPath === '/') return res.status(400).json({ error: 'invalid path' });
+  try {
+    await sshExec(`rm -rf "${targetPath}"`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/files/rename', requireAuth, async (req, res) => {
+  const { from, to } = req.body;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  try {
+    await sshExec(`mv "${from}" "${to}"`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.post('/api/files/copy', requireAuth, async (req, res) => {
+  const { from, to } = req.body;
+  if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+  try {
+    await sshExec(`cp -r "${from}" "${to}"`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+app.get('/api/files/download', requireAuth, async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) return res.status(400).json({ error: 'path required' });
+  let conn;
+  try {
+    conn = await sshConnect();
+    const sftp = await new Promise((resolve, reject) => {
+      conn.sftp((err, s) => err ? reject(err) : resolve(s));
+    });
+    const basename = filePath.split('/').pop();
+    res.setHeader('Content-Disposition', `attachment; filename="${basename}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const stream = sftp.createReadStream(filePath);
+    stream.on('error', e => { conn.end(); if (!res.headersSent) res.status(502).json({ error: e.message }); });
+    stream.on('end', () => conn.end());
+    stream.pipe(res);
+  } catch (e) {
+    if (conn) try { conn.end(); } catch {}
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// ─── SSH Command execution ───────────────────────────────────────────────────
+app.post('/api/ssh/exec', requireAuth, async (req, res) => {
+  const { command } = req.body;
+  if (!command) return res.status(400).json({ error: 'command required' });
+  try {
+    const output = await sshExec(command);
+    res.json({ ok: true, output });
+  } catch (e) {
+    res.json({ ok: false, output: e.message });
+  }
+});
+
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -1836,7 +1970,85 @@ app.get('*', (req, res) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+const WebSocket = require('ws');
+
+const server = app.listen(PORT, () => {
   console.log(`E2StreamHub running on http://0.0.0.0:${PORT}`);
   console.log(`Enigma2 receiver: ${enigmaBase}`);
+});
+
+// ─── WebSocket SSH Terminal ──────────────────────────────────────────────────
+const wss = new WebSocket.Server({ server, path: '/ws/ssh' });
+
+wss.on('connection', (ws, req) => {
+  if (!ENIGMA2_USER) {
+    ws.send(JSON.stringify({ type: 'error', data: 'SSH not configured (ENIGMA2_USER missing)' }));
+    ws.close();
+    return;
+  }
+
+  const conn = new SshClient();
+  let shell = null;
+
+  const timer = setTimeout(() => {
+    try { conn.end(); } catch {}
+    ws.send(JSON.stringify({ type: 'error', data: 'SSH connection timeout' }));
+    ws.close();
+  }, 12000);
+
+  conn.on('ready', () => {
+    clearTimeout(timer);
+    conn.shell({ term: 'xterm-256color', cols: 120, rows: 30 }, (err, stream) => {
+      if (err) {
+        ws.send(JSON.stringify({ type: 'error', data: err.message }));
+        conn.end();
+        ws.close();
+        return;
+      }
+      shell = stream;
+      ws.send(JSON.stringify({ type: 'connected' }));
+
+      stream.on('data', (data) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'data', data: data.toString('utf8') }));
+        }
+      });
+      stream.on('close', () => {
+        conn.end();
+        if (ws.readyState === WebSocket.OPEN) ws.close();
+      });
+    });
+  });
+
+  conn.on('error', (err) => {
+    clearTimeout(timer);
+    ws.send(JSON.stringify({ type: 'error', data: err.message }));
+    ws.close();
+  });
+
+  ws.on('message', (msg) => {
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.type === 'data' && shell) {
+        shell.write(parsed.data);
+      } else if (parsed.type === 'resize' && shell) {
+        shell.setWindow(parsed.rows, parsed.cols, 0, 0);
+      }
+    } catch {}
+  });
+
+  ws.on('close', () => {
+    clearTimeout(timer);
+    if (shell) try { shell.end(); } catch {}
+    try { conn.end(); } catch {}
+  });
+
+  conn.connect({
+    host: ENIGMA2_HOST,
+    port: ENIGMA2_SSH_PORT,
+    username: ENIGMA2_USER,
+    password: ENIGMA2_PASSWORD,
+    readyTimeout: 10000,
+    hostVerifier: () => true,
+  });
 });

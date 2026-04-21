@@ -235,6 +235,10 @@
         if (window._editorOpen) window._editorOpen();
       } else if (btn.dataset.view === 'receiver') {
         if (window._receiverOpen) window._receiverOpen();
+      } else if (btn.dataset.view === 'terminal') {
+        if (window._terminalOpen) window._terminalOpen();
+      } else if (btn.dataset.view === 'filebrowser') {
+        if (window._fileBrowserOpen) window._fileBrowserOpen();
       }
     });
   });
@@ -946,6 +950,8 @@
     // Skip when a modal/overlay is open
     if (eventModal.classList.contains('open')) return;
     if (epgOverlay.classList.contains('open')) return;
+    if (document.getElementById('terminalOverlay')?.classList.contains('open')) return;
+    if (document.getElementById('fileBrowserOverlay')?.classList.contains('open')) return;
 
     switch (e.key) {
       case 'm':

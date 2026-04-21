@@ -22,6 +22,15 @@ RUN wget -q --tries=3 --timeout=30 -O src/public/js/hls.min.js \
 RUN wget -q --tries=3 --timeout=30 -O src/public/js/sortable.min.js \
     https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js && \
     echo "sortable.min.js downloaded: $(wc -c < src/public/js/sortable.min.js) bytes"
+RUN wget -q --tries=3 --timeout=30 -O src/public/js/xterm.js \
+    https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js && \
+    echo "xterm.js downloaded: $(wc -c < src/public/js/xterm.js) bytes"
+RUN wget -q --tries=3 --timeout=30 -O src/public/css/xterm.css \
+    https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css && \
+    echo "xterm.css downloaded: $(wc -c < src/public/css/xterm.css) bytes"
+RUN wget -q --tries=3 --timeout=30 -O src/public/js/xterm-addon-fit.js \
+    https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js && \
+    echo "xterm-addon-fit.js downloaded: $(wc -c < src/public/js/xterm-addon-fit.js) bytes"
 
 EXPOSE 3000
 
