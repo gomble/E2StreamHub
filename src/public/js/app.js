@@ -41,6 +41,15 @@
   updateClock();
   setInterval(updateClock, 1000);
 
+  // ─── App version ──────────────────────────────────────────────────────────
+  fetch('/api/version').then(r => r.json()).then(d => {
+    const vLink = document.getElementById('appVersionLink');
+    if (vLink && d.version) {
+      vLink.textContent = 'v' + d.version;
+      vLink.href = `https://github.com/gomble/E2StreamHub/releases/tag/v${d.version}`;
+    }
+  }).catch(() => {});
+
   // ─── Receiver status check ────────────────────────────────────────────────
   async function checkStatus() {
     try {

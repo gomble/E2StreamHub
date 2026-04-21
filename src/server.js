@@ -1970,6 +1970,12 @@ app.post('/api/ssh/exec', requireAuth, async (req, res) => {
   }
 });
 
+// ─── App version ────────────────────────────────────────────────────────────
+const APP_VERSION = require('../package.json').version;
+app.get('/api/version', (req, res) => {
+  res.json({ version: APP_VERSION });
+});
+
 // ─── Static files & SPA fallback ─────────────────────────────────────────────
 
 app.use(express.static(path.join(__dirname, 'public')));

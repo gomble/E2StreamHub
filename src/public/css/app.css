@@ -122,6 +122,27 @@ input { font-family: inherit; }
 }
 .logout-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Topbar external links */
+.topbar-link {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); text-decoration: none;
+  font-size: 18px; transition: color .2s;
+}
+.topbar-link:hover { color: #fff; }
+.topbar-coffee { font-size: 17px; }
+.topbar-coffee:hover { color: #ffdd00; }
+.topbar-gh-icon { width: 18px; height: 18px; }
+.topbar-version {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: 'Consolas', 'Fira Code', monospace;
+  transition: color .2s, border-color .2s;
+}
+.topbar-version:hover { color: var(--text); border-color: var(--text-dim); }
+
 /* ─── Views ────────────────────────────────────────────────────────────────── */
 .view {
   position: fixed;
