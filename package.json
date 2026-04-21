@@ -1,6 +1,6 @@
 {
   "name": "e2streamhub",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Web-based streaming interface for Enigma2 receivers (OpenWebif)",
   "main": "src/server.js",
   "scripts": {

@@ -129,7 +129,7 @@ input { font-family: inherit; }
   font-size: 18px; transition: color .2s;
 }
 .topbar-link:hover { color: #fff; }
-.topbar-coffee { font-size: 17px; }
+.topbar-coffee { font-size: 22px; }
 .topbar-coffee:hover { color: #ffdd00; }
 .topbar-gh-icon { width: 18px; height: 18px; }
 .topbar-version {
