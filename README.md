@@ -22,6 +22,45 @@ Stream live TV, browse the EPG, manage bouquets, and fully control your receiver
 
 ---
 
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center"><b>Live TV Player</b></td>
+    <td align="center"><b>Recordings Playback</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/screenshot-player-live.png" alt="Live TV Player" /></td>
+    <td><img src="docs/screenshots/screenshot-player-recordings.png" alt="Recordings Playback" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>EPG Guide</b></td>
+    <td align="center"><b>Bouquet Editor</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/screenshot-epg.png" alt="EPG Guide" /></td>
+    <td><img src="docs/screenshots/screenshot-bouquet-editor.png" alt="Bouquet Editor" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Receiver Control</b></td>
+    <td align="center"><b>SSH Terminal</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/screenshot-receiver.png" alt="Receiver Settings" /></td>
+    <td><img src="docs/screenshots/screenshot-terminal.png" alt="SSH Terminal" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>File Browser</b></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/screenshot-filebrowser.png" alt="File Browser" /></td>
+    <td></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 ### 📡 Live Streaming
