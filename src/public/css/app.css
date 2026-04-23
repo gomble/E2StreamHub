@@ -2514,6 +2514,168 @@ input { font-family: inherit; }
 .fb-overlay.split-right .fb-path-input { width: 160px; }
 .terminal-overlay.split-left .cmd-sidebar { width: 160px; }
 
+/* ─── Hamburger / Mobile Nav ──────────────────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.hamburger-btn span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text-dim);
+  border-radius: 2px;
+  transition: background .2s;
+}
+.hamburger-btn:hover span { background: var(--text); }
+
+.mobile-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 399;
+  background: rgba(0,0,0,.6);
+}
+.mobile-nav-backdrop.open { display: block; }
+
+.mobile-nav {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 280px;
+  z-index: 400;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform .25s ease;
+  overflow-y: auto;
+}
+.mobile-nav.open { transform: translateX(0); }
+
+.mobile-nav-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  flex-shrink: 0;
+}
+.mobile-nav-close {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 14px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mobile-nav-close:hover { border-color: var(--accent); color: var(--accent); }
+
+.mobile-nav-items {
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.mobile-nav-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.mobile-nav-btn:hover { background: var(--bg4); color: var(--text); }
+.mobile-nav-btn.active { background: var(--accent); color: #fff; }
+.mobile-nav-btn-sub {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 16px;
+}
+
+.mobile-nav-footer {
+  padding: 12px 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mobile-nav-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.mobile-logout-btn {
+  margin-top: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.mobile-logout-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ─── Sidebar backdrop & toggle (mobile) ─────────────────────────────────── */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: rgba(0,0,0,.5);
+}
+.sidebar-backdrop.open { display: block; }
+
+.sidebar-toggle-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg3);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+.sidebar-toggle-btn:hover { background: var(--bg4); color: var(--text); }
+
 /* ─── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .epg-panel { display: none; }
@@ -2523,13 +2685,20 @@ input { font-family: inherit; }
 @media (max-width: 768px) {
   .editor-tabs { display: flex; }
   .editor-left { max-width: 100%; border-right: none; }
-  /* On mobile both panels are flex:1 but only one visible at a time */
   .editor-left:not(.ed-tab-hidden),
   .editor-right:not(.ed-tab-hidden) { display: flex; }
 }
 
+/* ─── Mobile (≤640px) ─────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .sidebar { width: 200px; }
+  :root { --topbar-h: 48px; }
+
+  /* Topbar: hamburger visible, nav hidden */
+  .hamburger-btn { display: flex; }
+  .topbar-nav { display: none; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar-title { font-size: 15px; }
+  .topbar-logo { font-size: 20px; }
   .current-time { display: none; }
   .cmd-sidebar { width: 140px; font-size: 11px; }
   .fb-quick-links { display: none; }
@@ -2540,4 +2709,157 @@ input { font-family: inherit; }
   .fb-overlay.split-right { left: 0; right: 0; }
   .terminal-overlay.split-left { bottom: 50%; top: 0; inset: 0 0 50% 0; }
   .fb-overlay.split-right { top: 50%; bottom: 0; inset: 50% 0 0 0; }
+  .logout-btn { display: none; }
+  .topbar-right { gap: 8px; }
+  /* Keep settings + log btns in topbar but smaller */
+  #appSettingsBtn, #logToggleBtn {
+    font-size: 16px;
+    padding: 4px 8px;
+  }
+
+  /* Sidebar: slide-in drawer on mobile */
+  .sidebar {
+    position: fixed;
+    top: var(--topbar-h);
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 90;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 16px rgba(0,0,0,.4);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Show sidebar toggle button */
+  .sidebar-toggle-btn { display: flex; }
+
+  /* Main content: full width */
+  .main-content { width: 100%; }
+
+  /* Video: give it more vertical space, controls accessible */
+  .video-wrapper { min-height: 200px; }
+  #videoPlayer { object-fit: contain; }
+
+  /* Now playing bar: compact on mobile */
+  .now-playing { padding: 8px 12px; gap: 8px; }
+  .now-playing-channel { font-size: 12px; }
+  .now-playing-title { font-size: 12px; }
+  .now-playing-time { font-size: 10px; }
+
+  /* Log panel: smaller on mobile */
+  .log-panel { height: 150px; }
+
+  /* ── EPG overlay ── */
+  .epg-guide-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .epg-guide-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .epg-guide-controls .bouquet-select { flex: 1 1 100%; }
+  .epg-time-nav {
+    flex-wrap: wrap;
+    margin-left: 0;
+    gap: 6px;
+    justify-content: center;
+  }
+  .epg-time-range { min-width: unset; font-size: 12px; }
+  :root { --epg-channel-w: 100px; --epg-hour-w: 180px; }
+
+  /* ── Editor overlay ── */
+  .editor-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .editor-header-left, .editor-header-center, .editor-header-right {
+    flex: unset;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .editor-header-center { order: 3; }
+  .editor-header-right { order: 2; justify-content: flex-end; margin-top: -36px; }
+  .editor-header-left { order: 1; }
+  .editor-bq-select { max-width: 100%; }
+  .editor-status { font-size: 11px; }
+
+  /* ── Receiver overlay ── */
+  .receiver-body { padding: 12px; gap: 12px; }
+  .rcv-section { padding: 12px 14px; }
+  .rcv-info-grid { grid-template-columns: 1fr; gap: 4px 0; }
+
+  /* Remote control: scale down to fit mobile screen */
+  .rcv-remote {
+    width: 100%;
+    max-width: 300px;
+    padding: 16px 14px 24px;
+    gap: 10px;
+  }
+  .rcv-rc-dpad {
+    width: 150px;
+    height: 150px;
+  }
+  .rcv-rc-ok {
+    width: 54px;
+    height: 54px;
+    font-size: 13px;
+  }
+  .rcv-rc-dpad-up    { top: 4px; }
+  .rcv-rc-dpad-down  { bottom: 4px; }
+  .rcv-rc-dpad-left  { left: 4px; }
+  .rcv-rc-dpad-right { right: 4px; }
+  .rcv-rc-num { font-size: 15px; padding: 10px 0; }
+  .rcv-rc-btn { font-size: 12px; padding: 9px 0; }
+  .rcv-rc-func { font-size: 10px; padding: 7px 0; }
+  .rcv-rc-side-btn { width: 38px; height: 32px; font-size: 13px; }
+  .rcv-rc-nav-area { gap: 8px; }
+  .rcv-rc-power, .rcv-rc-mute { width: 38px; height: 38px; font-size: 16px; }
+
+  /* Sleep timer row: wrap */
+  .rcv-sleep-row { flex-wrap: wrap; gap: 6px; }
+
+  /* Message row: wrap */
+  .rcv-msg-row { flex-wrap: wrap; }
+  .rcv-msg-input { flex: 1 1 100%; }
+  .rcv-msg-type { flex: 1; }
+
+  /* Timer list: smaller */
+  .rcv-timer-list { max-height: 240px; }
+
+  /* Settings list: adjust min-width */
+  .rcv-setting-key { min-width: 140px; font-size: 10px; }
+  .rcv-setting-val { font-size: 11px; }
+
+  /* ── App Settings overlay ── */
+  .appsettings-body { padding: 12px; gap: 12px; }
+  .as-form-grid { grid-template-columns: 1fr; gap: 6px 0; }
+  .as-form-grid .as-label { margin-top: 8px; }
+  .as-actions { flex-wrap: wrap; }
+
+  /* ── Modal ── */
+  .modal-panel { padding: 20px 16px 18px; }
+  .modal-title { font-size: 17px; }
+
+  /* ── PiP window: smaller on mobile ── */
+  .pip-window { width: 200px; bottom: 12px; right: 12px; }
+
+  /* ── Buttons: bigger tap targets ── */
+  .btn-secondary, .btn-icon { padding: 8px 14px; font-size: 13px; }
+  .btn-accent { padding: 8px 14px; }
+
+  /* ── Power buttons: full width on mobile ── */
+  .rcv-btn-row { gap: 6px; }
+  .rcv-btn { min-width: 0; flex: 1 1 calc(50% - 6px); }
+
+  /* ── Volume: bigger hit area ── */
+  .rcv-vol-btn { min-width: 44px; height: 44px; }
+  .rcv-vol-track { height: 12px; cursor: pointer; }
 }

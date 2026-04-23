@@ -31,6 +31,12 @@
       max-width: 560px;
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
     }
+    @media (max-width: 520px) {
+      .setup-card { padding: 24px 16px; border-radius: 0; border-left: none; border-right: none; }
+      body { padding: 0; align-items: flex-start; }
+      .field-row { flex-direction: column; gap: 0; }
+      .actions { flex-direction: column; }
+    }
 
     .logo {
       text-align: center;

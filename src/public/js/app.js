@@ -1289,3 +1289,114 @@
     updatePip,
   };
 })();
+
+// ─── Mobile UI ────────────────────────────────────────────────────────────────
+(function () {
+  const hamburgerBtn   = document.getElementById('hamburgerBtn');
+  const mobileNav      = document.getElementById('mobileNav');
+  const mobileNavBackdrop = document.getElementById('mobileNavBackdrop');
+  const mobileNavClose = document.getElementById('mobileNavClose');
+  const sidebar        = document.getElementById('sidebar');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+
+  // ── Mobile navigation drawer ──────────────────────────────────────────────
+  function openMobileNav() {
+    mobileNav.classList.add('open');
+    mobileNavBackdrop.classList.add('open');
+    mobileNav.setAttribute('aria-hidden', 'false');
+    hamburgerBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeMobileNav() {
+    mobileNav.classList.remove('open');
+    mobileNavBackdrop.classList.remove('open');
+    mobileNav.setAttribute('aria-hidden', 'true');
+    hamburgerBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  hamburgerBtn && hamburgerBtn.addEventListener('click', openMobileNav);
+  mobileNavClose && mobileNavClose.addEventListener('click', closeMobileNav);
+  mobileNavBackdrop && mobileNavBackdrop.addEventListener('click', closeMobileNav);
+
+  // Mobile nav view buttons mirror the topbar nav
+  document.querySelectorAll('.mobile-nav-btn[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      // Trigger same click as topbar nav
+      const topbarBtn = document.querySelector(`.topbar-nav .nav-btn[data-view="${view}"]`);
+      if (topbarBtn) topbarBtn.click();
+      // Sync active state in mobile nav
+      document.querySelectorAll('.mobile-nav-btn[data-view]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      closeMobileNav();
+    });
+  });
+
+  // Keep mobile nav active state in sync with topbar
+  document.querySelectorAll('.topbar-nav .nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      document.querySelectorAll('.mobile-nav-btn[data-view]').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === view);
+      });
+    });
+  });
+
+  // Mobile footer buttons
+  const mobileAppSettingsBtn = document.getElementById('mobileAppSettingsBtn');
+  const mobileLogToggleBtn   = document.getElementById('mobileLogToggleBtn');
+  const mobileLogoutBtn      = document.getElementById('mobileLogoutBtn');
+
+  mobileAppSettingsBtn && mobileAppSettingsBtn.addEventListener('click', () => {
+    closeMobileNav();
+    document.getElementById('appSettingsBtn') && document.getElementById('appSettingsBtn').click();
+  });
+  mobileLogToggleBtn && mobileLogToggleBtn.addEventListener('click', () => {
+    closeMobileNav();
+    document.getElementById('logToggleBtn') && document.getElementById('logToggleBtn').click();
+  });
+  mobileLogoutBtn && mobileLogoutBtn.addEventListener('click', () => {
+    document.getElementById('logoutBtn') && document.getElementById('logoutBtn').click();
+  });
+
+  // Sync status dot to mobile nav
+  const mainDot = document.getElementById('statusDot');
+  const mobileDot = document.getElementById('mobileStatusDot');
+  const mobileLabel = document.getElementById('mobileStatusLabel');
+  if (mainDot && mobileDot) {
+    const syncDot = () => {
+      mobileDot.className = mainDot.className;
+      mobileLabel.textContent = mobileDot.classList.contains('online') ? 'Receiver online' : 'Receiver offline';
+    };
+    new MutationObserver(syncDot).observe(mainDot, { attributes: true });
+  }
+
+  // ── Sidebar drawer (mobile) ───────────────────────────────────────────────
+  function openSidebar() {
+    sidebar && sidebar.classList.add('open');
+    sidebarBackdrop && sidebarBackdrop.classList.add('open');
+  }
+  function closeSidebar() {
+    sidebar && sidebar.classList.remove('open');
+    sidebarBackdrop && sidebarBackdrop.classList.remove('open');
+  }
+
+  sidebarToggleBtn && sidebarToggleBtn.addEventListener('click', openSidebar);
+  sidebarBackdrop && sidebarBackdrop.addEventListener('click', closeSidebar);
+
+  // Close sidebar when a channel is tapped (mobile)
+  document.getElementById('channelList') && document.getElementById('channelList').addEventListener('click', () => {
+    if (window.innerWidth <= 640) closeSidebar();
+  });
+  document.getElementById('recList') && document.getElementById('recList').addEventListener('click', () => {
+    if (window.innerWidth <= 640) closeSidebar();
+  });
+
+  // Close mobile nav on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeMobileNav();
+      closeSidebar();
+    }
+  });
+})();

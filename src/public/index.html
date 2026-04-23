@@ -20,6 +20,9 @@
 <!-- ─── Top Bar ──────────────────────────────────────────────────────────── -->
 <header class="topbar">
   <div class="topbar-left">
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
     <span class="topbar-logo">📺</span>
     <span class="topbar-title">E2StreamHub</span>
   </div>
@@ -45,9 +48,37 @@
   </div>
 </header>
 
+<!-- Mobile nav drawer -->
+<div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+<nav class="mobile-nav" id="mobileNav" aria-hidden="true">
+  <div class="mobile-nav-header">
+    <span class="topbar-logo">📺</span>
+    <span class="topbar-title">E2StreamHub</span>
+    <button class="mobile-nav-close" id="mobileNavClose" aria-label="Close menu">✕</button>
+  </div>
+  <div class="mobile-nav-items">
+    <button class="mobile-nav-btn active" data-view="player">▶ Player</button>
+    <button class="mobile-nav-btn" data-view="epg">📅 EPG Guide</button>
+    <button class="mobile-nav-btn" data-view="editor">✏️ Bouquet Editor</button>
+    <button class="mobile-nav-btn" data-view="receiver">📡 Receiver</button>
+  </div>
+  <div class="mobile-nav-footer">
+    <button class="mobile-nav-btn mobile-nav-btn-sub" id="mobileAppSettingsBtn">⚙ App Settings</button>
+    <button class="mobile-nav-btn mobile-nav-btn-sub" id="mobileLogToggleBtn">📋 Server Log</button>
+    <div class="mobile-nav-status">
+      <span class="status-dot" id="mobileStatusDot"></span>
+      <span id="mobileStatusLabel">Receiver</span>
+    </div>
+    <button class="mobile-logout-btn" id="mobileLogoutBtn">Sign out</button>
+  </div>
+</nav>
+
+<!-- Sidebar backdrop (mobile) -->
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
 <!-- ─── Player View ──────────────────────────────────────────────────────── -->
 <div class="view active" id="viewPlayer">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" data-sidebar="channels">Kanäle</button>
       <button class="sidebar-tab" data-sidebar="recordings">Aufnahmen</button>
@@ -74,6 +105,7 @@
   </aside>
 
   <main class="main-content">
+    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle channel list">☰ Channels</button>
         <div class="log-panel" id="logPanel" style="display:none">
       <div class="log-header">
         <span class="log-title">Server Log</span>
