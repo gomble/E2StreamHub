@@ -591,10 +591,10 @@
             <input type="checkbox" id="asTranscode" />
             <span class="as-toggle-text">Video re-encoding aktivieren</span>
           </label>
-          <label class="as-label">Probesize</label>
-          <input class="as-input" id="asProbesize" type="text" />
-          <label class="as-label">Analyzeduration</label>
-          <input class="as-input" id="asAnalyze" type="text" />
+          <label class="as-label">Probesize (MB)</label>
+          <input class="as-input" id="asProbesize" type="number" min="1" max="200" step="1" />
+          <label class="as-label">Analysedauer (Sekunden)</label>
+          <input class="as-input" id="asAnalyze" type="number" min="1" max="60" step="1" />
           <label class="as-label">Transcode Preset</label>
           <select class="bouquet-select" id="asPreset">
             <option value="ultrafast">ultrafast</option>
@@ -768,6 +768,7 @@
 <!-- ─── PiP Window ───────────────────────────────────────────────────────── -->
 <div class="pip-window" id="pipWindow">
   <span class="pip-channel-badge" id="pipChannel"></span>
+  <button class="pip-pause" id="pipPause" title="Pause">⏸</button>
   <button class="pip-close" id="pipClose" title="Close PiP">✕</button>
   <div class="pip-resize"></div>
 </div>

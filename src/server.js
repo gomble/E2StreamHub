@@ -286,7 +286,7 @@ const requireAuth = (req, res, next) => {
 
 app.post('/auth/login', (req, res) => {
   if (needsSetup) return res.status(503).json({ error: 'Setup required' });
-  const { username, password, totp } = req.body;
+  const { username, password, totp, rememberMe } = req.body;
   if (username !== APP_USERNAME || password !== APP_PASSWORD) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
@@ -297,6 +297,7 @@ app.post('/auth/login', (req, res) => {
     }
   }
   req.session.authenticated = true;
+  if (rememberMe) req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
   res.json({ success: true });
 });
 

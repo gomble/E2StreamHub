@@ -46,8 +46,8 @@
       document.getElementById('asEnigmaPwd').value   = data.ENIGMA2_PASSWORD || '';
       document.getElementById('asStreamAuth').checked = data.ENIGMA2_STREAM_AUTH === 'true';
       document.getElementById('asTranscode').checked  = data.FFMPEG_FORCE_VIDEO_TRANSCODE === 'true';
-      document.getElementById('asProbesize').value    = data.FFMPEG_PROBESIZE || '';
-      document.getElementById('asAnalyze').value      = data.FFMPEG_ANALYZEDURATION || '';
+      document.getElementById('asProbesize').value    = Math.round((parseInt(data.FFMPEG_PROBESIZE, 10) || 10000000) / 1000000);
+      document.getElementById('asAnalyze').value      = Math.round((parseInt(data.FFMPEG_ANALYZEDURATION, 10) || 10000000) / 1000000);
       document.getElementById('asPreset').value       = data.FFMPEG_TRANSCODE_PRESET || 'ultrafast';
       document.getElementById('asHlsSeg').value       = data.HLS_SEGMENT_SECONDS || '';
       document.getElementById('asHlsList').value      = data.HLS_LIST_SIZE || '';
@@ -176,8 +176,8 @@
       ENIGMA2_PASSWORD: document.getElementById('asEnigmaPwd').value,
       ENIGMA2_STREAM_AUTH: document.getElementById('asStreamAuth').checked ? 'true' : 'false',
       FFMPEG_FORCE_VIDEO_TRANSCODE: document.getElementById('asTranscode').checked ? 'true' : 'false',
-      FFMPEG_PROBESIZE: document.getElementById('asProbesize').value.trim(),
-      FFMPEG_ANALYZEDURATION: document.getElementById('asAnalyze').value.trim(),
+      FFMPEG_PROBESIZE: String(Math.round((parseFloat(document.getElementById('asProbesize').value) || 10) * 1000000)),
+      FFMPEG_ANALYZEDURATION: String(Math.round((parseFloat(document.getElementById('asAnalyze').value) || 10) * 1000000)),
       FFMPEG_TRANSCODE_PRESET: document.getElementById('asPreset').value,
       HLS_SEGMENT_SECONDS: document.getElementById('asHlsSeg').value.trim(),
       HLS_LIST_SIZE: document.getElementById('asHlsList').value.trim(),

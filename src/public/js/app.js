@@ -155,7 +155,20 @@
   const pipWindow       = document.getElementById('pipWindow');
   const pipChannelBadge = document.getElementById('pipChannel');
   const pipClose        = document.getElementById('pipClose');
+  const pipPause        = document.getElementById('pipPause');
   const videoWrapper    = document.querySelector('.video-wrapper');
+
+  function syncPipPause() {
+    pipPause.textContent = videoEl.paused ? '▶' : '⏸';
+    pipPause.title = videoEl.paused ? 'Play' : 'Pause';
+  }
+
+  pipPause.addEventListener('click', () => {
+    if (videoEl.paused) videoEl.play().catch(() => {});
+    else videoEl.pause();
+  });
+  videoEl.addEventListener('pause', syncPipPause);
+  videoEl.addEventListener('play',  syncPipPause);
 
   function showPip() {
     if (!currentSRef) return;
@@ -163,6 +176,7 @@
     videoEl.controls = false;
     pipWindow.appendChild(videoEl);
     pipWindow.classList.add('active');
+    syncPipPause();
     videoEl.play().catch(() => {});
   }
 
@@ -197,7 +211,7 @@
   (function initPipDrag() {
     let dragging = false, ox = 0, oy = 0;
     pipWindow.addEventListener('mousedown', e => {
-      if (e.target.closest('.pip-close') || e.target.closest('.pip-resize')) return;
+      if (e.target.closest('.pip-close') || e.target.closest('.pip-pause') || e.target.closest('.pip-resize')) return;
       dragging = true;
       ox = e.clientX - pipWindow.offsetLeft;
       oy = e.clientY - pipWindow.offsetTop;

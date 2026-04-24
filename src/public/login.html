@@ -106,6 +106,32 @@
     button[type="submit"]:hover { background: #c0060f; }
     button[type="submit"]:disabled { opacity: .5; cursor: not-allowed; }
 
+    .remember-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .remember-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #888;
+      cursor: pointer;
+      margin-bottom: 0;
+      user-select: none;
+    }
+    .remember-row input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #e50914;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
     .error {
       background: rgba(229, 9, 20, .15);
       border: 1px solid rgba(229, 9, 20, .4);
@@ -143,6 +169,9 @@
         <label for="totp">2FA Code</label>
         <input type="text" id="totp" name="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-stelliger Code" />
       </div>
+      <div class="remember-row">
+        <label><input type="checkbox" id="rememberMe" /> Remember me (30 Tage)</label>
+      </div>
       <button type="submit" id="submitBtn">Sign in</button>
     </form>
   </div>
@@ -165,6 +194,7 @@
       const payload = {
         username: document.getElementById('username').value,
         password: document.getElementById('password').value,
+        rememberMe: document.getElementById('rememberMe').checked,
       };
       if (needs2fa) payload.totp = document.getElementById('totp').value;
 
