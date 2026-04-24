@@ -507,6 +507,7 @@ function buildHlsArgs(sourceUrl, programNum, outPlaylist) {
     '-max_error_rate', '1.0',      // tolerate all decode errors; never crash on corrupt stream
     '-probesize', FFMPEG_PROBESIZE,
     '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-scan_all_pmts', '1',
     '-i', sourceUrl,
     '-ignore_unknown',             // suppress unknown private-data stream warnings
   ];
@@ -1277,7 +1278,7 @@ app.get('/stream-recording', requireAuth, async (req, res) => {
     '-c:v', 'libx264',
     '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
     '-tune', 'zerolatency',
-    '-profile:v', 'high', '-level:v', '4.0',
+    '-profile:v', 'high', '-level:v', '5.1',
     '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
     '-c:a', 'aac', '-ac', '2', '-ar', '48000', '-b:a', '128k',
     '-f', 'mp4',
@@ -1728,6 +1729,7 @@ app.get('/stream-fmp4', requireAuth, async (req, res) => {
     '-max_error_rate', '1.0',
     '-probesize', FFMPEG_PROBESIZE,
     '-analyzeduration', FFMPEG_ANALYZEDURATION,
+    '-scan_all_pmts', '1',
   ];
   if (!isRecording) ffArgs.push('-flags', 'low_delay', '-thread_queue_size', '512');
   ffArgs.push('-i', sourceUrl, '-ignore_unknown');
@@ -1744,7 +1746,7 @@ app.get('/stream-fmp4', requireAuth, async (req, res) => {
     '-c:v', 'libx264',
     '-preset', FFMPEG_FORCE_VIDEO_TRANSCODE ? FFMPEG_TRANSCODE_PRESET : 'ultrafast',
     '-tune', 'zerolatency',
-    '-profile:v', 'high', '-level:v', '4.0',
+    '-profile:v', 'high', '-level:v', '5.1',
     '-g', '25', '-keyint_min', '25', '-sc_threshold', '0',
     '-c:a', 'aac', '-ac', '2', '-ar', '48000', '-b:a', '128k',
     '-f', 'mp4',
