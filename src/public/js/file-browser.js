@@ -44,6 +44,7 @@
     overlay.classList.remove('split-right');
     const termOv = document.getElementById('terminalOverlay');
     if (termOv) termOv.classList.remove('split-left');
+    if (window._app?.setActiveNav) window._app.setActiveNav('player');
   }
 
   closeBtn.addEventListener('click', close);

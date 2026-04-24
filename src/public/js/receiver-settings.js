@@ -19,6 +19,7 @@
     overlay.setAttribute('aria-hidden', 'true');
     clearInterval(signalTimer);
     signalTimer = null;
+    if (window._app?.setActiveNav) window._app.setActiveNav('player');
     if (window._app?.updatePip) window._app.updatePip();
   }
 

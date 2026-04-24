@@ -23,6 +23,7 @@
   function close() {
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
+    if (window._app?.setActiveNav) window._app.setActiveNav('player');
   }
 
   closeBtn.addEventListener('click', close);

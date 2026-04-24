@@ -240,7 +240,17 @@
   function closeEpgOverlay() {
     epgOverlay.classList.remove('open');
     epgOverlay.setAttribute('aria-hidden', 'true');
+    setActiveNav('player');
     updatePip();
+  }
+
+  function setActiveNav(view) {
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b =>
+      b.classList.toggle('active', b.dataset.view === view)
+    );
+    document.querySelectorAll('.mobile-nav-btn[data-view]').forEach(b =>
+      b.classList.toggle('active', b.dataset.view === view)
+    );
   }
 
   function closeAllOverlays() {
@@ -249,26 +259,20 @@
      document.getElementById('fileBrowserOverlay')].forEach(ov => {
       if (ov) { ov.classList.remove('open'); ov.setAttribute('aria-hidden', 'true'); }
     });
+    setActiveNav('player');
   }
 
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (btn.dataset.view === 'epg') {
-        closeAllOverlays();
-        openEpgOverlay();
-      } else if (btn.dataset.view === 'editor') {
-        closeAllOverlays();
-        if (window._editorOpen) window._editorOpen();
-      } else if (btn.dataset.view === 'receiver') {
-        closeAllOverlays();
-        if (window._receiverOpen) window._receiverOpen();
-      } else if (btn.dataset.view === 'terminal') {
-        closeAllOverlays();
-        if (window._terminalOpen) window._terminalOpen();
-      } else if (btn.dataset.view === 'filebrowser') {
-        closeAllOverlays();
-        if (window._fileBrowserOpen) window._fileBrowserOpen();
-      }
+      const view = btn.dataset.view;
+      if (!view) return;
+      closeAllOverlays();
+      setActiveNav(view);
+      if (view === 'epg') openEpgOverlay();
+      else if (view === 'editor' && window._editorOpen) window._editorOpen();
+      else if (view === 'receiver' && window._receiverOpen) window._receiverOpen();
+      else if (view === 'terminal' && window._terminalOpen) window._terminalOpen();
+      else if (view === 'filebrowser' && window._fileBrowserOpen) window._fileBrowserOpen();
     });
   });
 
@@ -1308,6 +1312,7 @@
     channelCache,
     updatePip,
     closeAllOverlays,
+    setActiveNav,
   };
 })();
 

@@ -18,6 +18,7 @@
   function close() {
     overlay.classList.remove('open');
     overlay.setAttribute('aria-hidden', 'true');
+    if (window._app?.setActiveNav) window._app.setActiveNav('player');
     if (window._app?.updatePip) window._app.updatePip();
   }
 
