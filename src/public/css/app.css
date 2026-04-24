@@ -49,7 +49,7 @@ input { font-family: inherit; }
   align-items: center;
   padding: 0 16px;
   gap: 16px;
-  z-index: 100;
+  z-index: 301;
 }
 
 .topbar-left {

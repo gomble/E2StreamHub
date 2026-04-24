@@ -8,6 +8,7 @@
   function api(url, opts) { return window._app.apiFetch(url, opts); }
 
   function open() {
+    if (window._app?.closeAllOverlays) window._app.closeAllOverlays();
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     if (window._app?.updatePip) window._app.updatePip();
@@ -19,6 +20,11 @@
     overlay.setAttribute('aria-hidden', 'true');
     if (window._app?.updatePip) window._app.updatePip();
   }
+
+  document.getElementById('asPipEnabled').addEventListener('change', function () {
+    localStorage.setItem('pipEnabled', this.checked ? 'true' : 'false');
+    if (window._app?.updatePip) window._app.updatePip();
+  });
 
   openBtn.addEventListener('click', open);
   closeBtn.addEventListener('click', close);
@@ -45,6 +51,7 @@
       document.getElementById('asHlsSeg').value       = data.HLS_SEGMENT_SECONDS || '';
       document.getElementById('asHlsList').value      = data.HLS_LIST_SIZE || '';
       document.getElementById('asNewUser').placeholder = data.APP_USERNAME || '(unverändert)';
+      document.getElementById('asPipEnabled').checked = localStorage.getItem('pipEnabled') !== 'false';
 
       render2faStatus(data.has2fa);
     } catch (err) {

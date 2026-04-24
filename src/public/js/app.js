@@ -163,6 +163,7 @@
     videoEl.controls = false;
     pipWindow.appendChild(videoEl);
     pipWindow.classList.add('active');
+    videoEl.play().catch(() => {});
   }
 
   function hidePip() {
@@ -170,13 +171,19 @@
     videoWrapper.insertBefore(videoEl, videoWrapper.querySelector('.video-overlay'));
     videoEl.controls = true;
     pipWindow.classList.remove('active');
+    videoEl.play().catch(() => {});
   }
 
   function updatePip() {
+    if (localStorage.getItem('pipEnabled') === 'false') { hidePip(); return; }
+    const termOverlay = document.getElementById('terminalOverlay');
+    const fbOverlay   = document.getElementById('fileBrowserOverlay');
     const anyOpen = epgOverlay.classList.contains('open')
                  || editorOverlay.classList.contains('open')
                  || receiverOverlay.classList.contains('open')
-                 || appSettingsOverlay.classList.contains('open');
+                 || appSettingsOverlay.classList.contains('open')
+                 || (termOverlay && termOverlay.classList.contains('open'))
+                 || (fbOverlay && fbOverlay.classList.contains('open'));
     if (anyOpen && currentSRef) showPip();
     else hidePip();
   }
@@ -236,17 +243,30 @@
     updatePip();
   }
 
+  function closeAllOverlays() {
+    [epgOverlay, editorOverlay, receiverOverlay, appSettingsOverlay,
+     document.getElementById('terminalOverlay'),
+     document.getElementById('fileBrowserOverlay')].forEach(ov => {
+      if (ov) { ov.classList.remove('open'); ov.setAttribute('aria-hidden', 'true'); }
+    });
+  }
+
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.view === 'epg') {
+        closeAllOverlays();
         openEpgOverlay();
       } else if (btn.dataset.view === 'editor') {
+        closeAllOverlays();
         if (window._editorOpen) window._editorOpen();
       } else if (btn.dataset.view === 'receiver') {
+        closeAllOverlays();
         if (window._receiverOpen) window._receiverOpen();
       } else if (btn.dataset.view === 'terminal') {
+        closeAllOverlays();
         if (window._terminalOpen) window._terminalOpen();
       } else if (btn.dataset.view === 'filebrowser') {
+        closeAllOverlays();
         if (window._fileBrowserOpen) window._fileBrowserOpen();
       }
     });
@@ -1287,6 +1307,7 @@
     get allBouquets() { return allBouquets; },
     channelCache,
     updatePip,
+    closeAllOverlays,
   };
 })();
 

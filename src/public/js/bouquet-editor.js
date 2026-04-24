@@ -95,6 +95,13 @@
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden', 'false');
     if (window._app?.updatePip) window._app.updatePip();
+    if (!currentBRef) {
+      const bouquets = window._app?.allBouquets || [];
+      if (bouquets.length > 0) {
+        bqSelect.value = bouquets[0].ref;
+        loadBouquet(bouquets[0].ref);
+      }
+    }
   }
 
   function close() {
