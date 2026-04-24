@@ -209,22 +209,32 @@
 
   // Drag PiP window
   (function initPipDrag() {
-    let dragging = false, ox = 0, oy = 0;
+    let dragging = false, ox = 0, oy = 0, dragMoved = false;
     pipWindow.addEventListener('mousedown', e => {
       if (e.target.closest('.pip-close') || e.target.closest('.pip-pause') || e.target.closest('.pip-resize')) return;
       dragging = true;
+      dragMoved = false;
       ox = e.clientX - pipWindow.offsetLeft;
       oy = e.clientY - pipWindow.offsetTop;
       e.preventDefault();
     });
     document.addEventListener('mousemove', e => {
       if (!dragging) return;
+      dragMoved = true;
       pipWindow.style.left = `${e.clientX - ox}px`;
       pipWindow.style.top  = `${e.clientY - oy}px`;
       pipWindow.style.right = 'auto';
       pipWindow.style.bottom = 'auto';
     });
-    document.addEventListener('mouseup', () => { dragging = false; });
+    document.addEventListener('mouseup', () => {
+      if (dragging && !dragMoved) {
+        // Plain click on PIP → close all overlays and return to player
+        closeAllOverlays();
+        setActiveNav('player');
+      }
+      dragging = false;
+      dragMoved = false;
+    });
 
     // Resize from bottom-left corner
     const resizeHandle = pipWindow.querySelector('.pip-resize');
