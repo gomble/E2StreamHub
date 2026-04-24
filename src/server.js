@@ -1726,8 +1726,8 @@ app.get('/stream-fmp4', requireAuth, async (req, res) => {
     '-fflags', '+genpts+discardcorrupt' + (isRecording ? '' : '+nobuffer'),
     '-err_detect', 'ignore_err',
     '-max_error_rate', '1.0',
-    '-probesize', isRecording ? FFMPEG_PROBESIZE : '500000',
-    '-analyzeduration', isRecording ? FFMPEG_ANALYZEDURATION : '500000',
+    '-probesize', FFMPEG_PROBESIZE,
+    '-analyzeduration', FFMPEG_ANALYZEDURATION,
   ];
   if (!isRecording) ffArgs.push('-flags', 'low_delay', '-thread_queue_size', '512');
   ffArgs.push('-i', sourceUrl, '-ignore_unknown');
