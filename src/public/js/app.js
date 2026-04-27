@@ -1446,21 +1446,31 @@
   }
 
   // ── Sidebar drawer (mobile) ───────────────────────────────────────────────
-  let sidebarOpenTs = 0;
+  // The backdrop is click-transparent (CSS pointer-events: none).
+  // Closing happens via a document-level outside-click handler — this avoids
+  // z-index hit-test problems caused by .view (position:fixed) creating a
+  // stacking context that paints below sidebarBackdrop (z-index: 89).
+  function outsideClickHandler(e) {
+    if (sidebar.contains(e.target)) return;
+    if (sidebarToggleBtn && sidebarToggleBtn.contains(e.target)) return;
+    closeSidebar();
+  }
+
   function openSidebar() {
-    sidebar && sidebar.classList.add('open');
+    if (!sidebar) return;
+    sidebar.classList.add('open');
     sidebarBackdrop && sidebarBackdrop.classList.add('open');
-    sidebarOpenTs = Date.now();
+    // Defer attaching the listener so the click that opened it doesn't immediately close it
+    setTimeout(() => document.addEventListener('click', outsideClickHandler), 0);
   }
   function closeSidebar() {
-    sidebar && sidebar.classList.remove('open');
+    if (!sidebar) return;
+    sidebar.classList.remove('open');
     sidebarBackdrop && sidebarBackdrop.classList.remove('open');
+    document.removeEventListener('click', outsideClickHandler);
   }
 
   sidebarToggleBtn && sidebarToggleBtn.addEventListener('click', openSidebar);
-  sidebarBackdrop && sidebarBackdrop.addEventListener('click', () => {
-    if (Date.now() - sidebarOpenTs > 350) closeSidebar();
-  });
 
   // Close sidebar only when an actual channel item is tapped (mobile)
   document.getElementById('channelList') && document.getElementById('channelList').addEventListener('click', e => {

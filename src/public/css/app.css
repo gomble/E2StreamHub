@@ -1029,7 +1029,10 @@ input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   justify-content: center;
+  contain: layout style paint;
 }
+
+.epg-channel-row { contain: layout style; }
 
 .epg-program-inner {
   position: sticky;
@@ -2881,10 +2884,11 @@ input { font-family: inherit; }
     transform: translateX(0);
   }
 
-  /* Backdrop only covers the area to the right of the sidebar —
-     prevents click-through caused by .view z-index: auto stacking below z-index: 89 */
-  .sidebar-backdrop.open {
-    left: 280px;
+  /* Backdrop is purely visual — clicks pass through.
+     Closing the sidebar is handled by a document-level outside-click listener.
+     This avoids z-index hit-test issues from .view's stacking context. */
+  .sidebar-backdrop {
+    pointer-events: none;
   }
 
   /* Show sidebar toggle button */
@@ -2905,6 +2909,14 @@ input { font-family: inherit; }
 
   /* Log panel: smaller on mobile */
   .log-panel { height: 150px; }
+
+  /* ── EPG performance on mobile ──
+     iOS Safari struggles with hundreds of position:sticky + transitions.
+     Drop sticky on program titles, kill transitions, GPU-promote the now-line. */
+  .epg-program { transition: none; }
+  .epg-program-inner { position: static; }
+  .epg-channel-label { will-change: auto; }
+  .epg-now-line { transform: translateZ(0); }
 
   /* ── EPG overlay ── */
   .epg-guide-header {
