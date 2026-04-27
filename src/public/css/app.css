@@ -2881,6 +2881,12 @@ input { font-family: inherit; }
     transform: translateX(0);
   }
 
+  /* Backdrop only covers the area to the right of the sidebar —
+     prevents click-through caused by .view z-index: auto stacking below z-index: 89 */
+  .sidebar-backdrop.open {
+    left: 280px;
+  }
+
   /* Show sidebar toggle button */
   .sidebar-toggle-btn { display: flex; }
 
