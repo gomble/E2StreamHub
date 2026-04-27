@@ -41,6 +41,30 @@
   updateClock();
   setInterval(updateClock, 1000);
 
+  // ─── Donation popup ───────────────────────────────────────────────────────
+  (() => {
+    const STORAGE_KEY = 'e2sh_donate_last';
+    const DELAY_MS    = 3 * 60 * 1000;  // 3 minutes after login
+    const INTERVAL_MS = 48 * 60 * 60 * 1000; // repeat every 48 h
+
+    const last = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+    if (Date.now() - last < INTERVAL_MS) return;
+
+    const backdrop   = document.getElementById('donateBackdrop');
+    const closeBtn   = document.getElementById('donateClose');
+    const laterBtn   = document.getElementById('donateLater');
+    const coffeeLink = document.getElementById('donateCoffeeBtn');
+
+    function show() { backdrop.classList.add('open'); backdrop.setAttribute('aria-hidden', 'false'); }
+    function hide() { backdrop.classList.remove('open'); backdrop.setAttribute('aria-hidden', 'true'); localStorage.setItem(STORAGE_KEY, Date.now()); }
+
+    setTimeout(show, DELAY_MS);
+    closeBtn.addEventListener('click', hide);
+    laterBtn.addEventListener('click', hide);
+    coffeeLink.addEventListener('click', hide);
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) hide(); });
+  })();
+
   // ─── App version ──────────────────────────────────────────────────────────
   fetch('/api/version').then(r => r.json()).then(d => {
     const vLink = document.getElementById('appVersionLink');

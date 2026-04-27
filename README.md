@@ -157,6 +157,7 @@ Stream live TV, browse the EPG, manage bouquets, control your receiver, run SSH 
 - **Picture-in-Picture** — draggable & resizable floating player, stays visible across all views
 - **Web-based Setup Wizard** — guided first-launch configuration, no manual config files needed
 - **Response compression** — gzip on all API responses for fast loading on slow networks
+- **Donation reminder** — periodic popup (every 48 h) with a Buy Me a Coffee link to support the project
 - **API caching** — bouquets (2 min), services (2 min), EPG (30 s) to avoid hammering the receiver
 
 ---
