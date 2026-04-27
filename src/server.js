@@ -1359,22 +1359,28 @@ app.post('/hls/start', requireAuth, async (req, res) => {
     const decodedSRef = decodeURIComponent(sRef);
     const isRec = isRecordingSRef(decodedSRef);
     const iptvUrl = extractIptvUrl(decodedSRef);
-    // For IPTV (5001/5002) and recordings, ffmpeg reads the source as-is — no program mapping
-    const programNum = (iptvUrl || isRec) ? null : getProgramNumber(decodedSRef);
     const sessionId = crypto.randomUUID();
     fs.mkdirSync(hlsRootDir, { recursive: true });
     const sessionDir = path.join(hlsRootDir, sessionId);
     fs.mkdirSync(sessionDir, { recursive: true });
     const playlistPath = path.join(sessionDir, 'index.m3u8');
 
-    // IPTV: use embedded HTTP URL directly (receiver:8001 doesn't proxy these)
-    // Otherwise: try stream.m3u for single-program URL, fall back to receiver:8001 with program mapping
+    // Pick the right source. Program mapping is only needed when reading the
+    // raw MPTS off receiver:8001 — both IPTV and SPTS URLs are already
+    // single-program, so passing -map 0:p:N would match nothing and ffmpeg
+    // would produce no output.
     let sourceUrl;
+    let programNum = null;
     if (iptvUrl) {
       sourceUrl = iptvUrl;
     } else if (!isRec) {
       const sptsUrl = await resolveSptsUrl(decodedSRef);
-      sourceUrl = sptsUrl || buildSourceUrl(decodedSRef);
+      if (sptsUrl) {
+        sourceUrl = sptsUrl;
+      } else {
+        sourceUrl = buildSourceUrl(decodedSRef);
+        programNum = getProgramNumber(decodedSRef);
+      }
     } else {
       sourceUrl = buildSourceUrl(decodedSRef);
     }
