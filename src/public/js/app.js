@@ -1446,9 +1446,11 @@
   }
 
   // ── Sidebar drawer (mobile) ───────────────────────────────────────────────
+  let sidebarOpenTs = 0;
   function openSidebar() {
     sidebar && sidebar.classList.add('open');
     sidebarBackdrop && sidebarBackdrop.classList.add('open');
+    sidebarOpenTs = Date.now();
   }
   function closeSidebar() {
     sidebar && sidebar.classList.remove('open');
@@ -1456,14 +1458,16 @@
   }
 
   sidebarToggleBtn && sidebarToggleBtn.addEventListener('click', openSidebar);
-  sidebarBackdrop && sidebarBackdrop.addEventListener('click', closeSidebar);
-
-  // Close sidebar when a channel is tapped (mobile)
-  document.getElementById('channelList') && document.getElementById('channelList').addEventListener('click', () => {
-    if (window.innerWidth <= 640) closeSidebar();
+  sidebarBackdrop && sidebarBackdrop.addEventListener('click', () => {
+    if (Date.now() - sidebarOpenTs > 350) closeSidebar();
   });
-  document.getElementById('recList') && document.getElementById('recList').addEventListener('click', () => {
-    if (window.innerWidth <= 640) closeSidebar();
+
+  // Close sidebar only when an actual channel item is tapped (mobile)
+  document.getElementById('channelList') && document.getElementById('channelList').addEventListener('click', e => {
+    if (window.innerWidth <= 640 && e.target.closest('.channel-item')) closeSidebar();
+  });
+  document.getElementById('recList') && document.getElementById('recList').addEventListener('click', e => {
+    if (window.innerWidth <= 640 && e.target.closest('.channel-item')) closeSidebar();
   });
 
   // Close mobile nav on Escape
